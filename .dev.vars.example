@@ -1,0 +1,3 @@
+# No environment variables needed.
+# The Strateegia API key is passed by the client as an Authorization header,
+# not stored in environment variables.
