@@ -5,7 +5,7 @@ import { strateegiaFetch, apiErrorToMcpResult } from "../strateegia-client.js";
 export function registerMapTools(server: McpServer, getToken: () => string) {
 	server.tool(
 		"create_map",
-		"Creates a new journey map inside a project. A map is a visual flow where you add points (divergence, convergence, essay, monitor). Every project needs at least one map before you can add points.",
+		"Creates a new journey map (mapa) inside a project (jornada). A map is a visual flow where you add points: debate (divergence), decision (convergence), evaluation (essay), monitoring (monitor). Every project needs at least one map before you can add points.",
 		{
 			project_id: z.string().describe("Project UUID"),
 			title: z.string().max(35).default("").describe("Map title (max 35 chars)"),

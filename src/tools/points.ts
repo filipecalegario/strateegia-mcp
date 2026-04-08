@@ -19,7 +19,7 @@ const questionSchema = z.object({
 export function registerPointTools(server: McpServer, getToken: () => string) {
 	server.tool(
 		"create_divergence_point",
-		"Creates a divergence point — for collecting ideas and responses from participants (brainstorming, discussion). Two modes: (A) pass custom questions directly and a tool template is created automatically, or (B) pass a tool_id from an existing template (use list_tool_templates to find one). Mode A is recommended for most cases.",
+		"Creates a divergence point (ponto de debate) — for collecting ideas and responses from participants (brainstorming, discussion). Also called 'debate point' in Portuguese Strateegia UI. Two modes: (A) pass custom questions directly and a tool template is created automatically, or (B) pass a tool_id from an existing template (use list_tool_templates to find one). Mode A is recommended for most cases.",
 		{
 			map_id: z.string().describe("Map UUID"),
 			title: z.string().min(1).max(100).describe("Point title (also used as tool template name in mode A)"),
@@ -88,7 +88,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 
 	server.tool(
 		"update_divergence_point",
-		"Updates an existing divergence point. Pass only the fields you want to change — title, introduction, and/or visibility. Each field triggers a separate PATCH call to the API.",
+		"Updates an existing divergence point (ponto de debate). Pass only the fields you want to change — title, introduction, and/or visibility. Each field triggers a separate PATCH call to the API.",
 		{
 			divergence_point_id: z.string().describe("Divergence point UUID"),
 			title: z.string().min(3).max(100).optional().describe("New title"),
@@ -137,7 +137,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 
 	server.tool(
 		"create_convergence_point",
-		"Creates a convergence point — for group decision-making via polls. Define questions with options that participants vote on. Each question must have at least one option. Set a closing_date (ISO 8601) for when voting ends.",
+		"Creates a convergence point (ponto de decisao) — for collaborative group decision-making via polls. Also called 'decision point' in Portuguese Strateegia UI. Define questions with options that participants vote on. Each question must have at least one option. Set a closing_date (ISO 8601) for when voting ends.",
 		{
 			map_id: z.string().describe("Map UUID"),
 			name: z.string().min(1).describe("Point title"),
@@ -175,7 +175,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 
 	server.tool(
 		"create_essay_point",
-		"Creates an essay point — for long-form text responses and optional peer evaluation. Participants write on a theme. Types: ESSAY (free writing), CHALLENGING_SITUATION (scenario analysis), SUBJECTIVE_QUESTION (open question). Set evaluation modes to enable peer review.",
+		"Creates an essay point (ponto de avaliacao) — for long-form text responses and optional peer evaluation. Also called 'evaluation point' in Portuguese Strateegia UI. Participants write on a theme. Types: ESSAY (free writing), CHALLENGING_SITUATION (scenario analysis), SUBJECTIVE_QUESTION (open question). Set evaluation modes to enable peer review.",
 		{
 			map_id: z.string().describe("Map UUID"),
 			essay_name: z.string().min(1).describe("Point title"),
@@ -247,7 +247,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 
 	server.tool(
 		"create_monitor_point",
-		"Creates a monitor point — for tracking progress. QUALITATIVE: team reports status (IN_PROGRESS/SUSPENDED/COMPLETED). QUANTITATIVE: tracks a numeric metric toward a goal (set goal, type label, and flow direction UP or DOWN).",
+		"Creates a monitor point (ponto de monitoramento) — for tracking progress and performance indicators. Also called 'monitoring point' in Portuguese Strateegia UI. QUALITATIVE: team reports status (IN_PROGRESS/SUSPENDED/COMPLETED). QUANTITATIVE: tracks a numeric metric toward a goal (set goal, type label, and flow direction UP or DOWN).",
 		{
 			map_id: z.string().describe("Map UUID"),
 			name: z.string().min(3).max(100).describe("Point title"),

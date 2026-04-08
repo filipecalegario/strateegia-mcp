@@ -7,7 +7,7 @@ const COLORS = ["PURPLE", "BLUE", "TEAL", "ORANGE", "MAGENTA", "PINK", "YELLOW"]
 export function registerProjectTools(server: McpServer, getToken: () => string) {
 	server.tool(
 		"list_projects",
-		"Lists projects accessible to the authenticated user. Returns paginated results (content[], total_pages, total_elements). Each project has id, title, color, lab info. Start here to explore the workspace.",
+		"Lists projects (jornadas) accessible to the authenticated user. A project is called 'jornada' in Portuguese Strateegia UI. Returns paginated results (content[], total_pages, total_elements). Each project has id, title, color, lab info. Start here to explore the workspace.",
 		{
 			page: z.number().int().min(0).default(0).describe("Zero-based page index"),
 			size: z.number().int().min(1).max(100).default(20).describe("Page size"),
