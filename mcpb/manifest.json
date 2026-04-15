@@ -2,7 +2,7 @@
   "manifest_version": "0.1",
   "name": "strateegia",
   "display_name": "Strateegia",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Gerencie projetos, jornadas e pontos do Strateegia direto no Claude Desktop.",
   "long_description": "Esta extensão conecta o Claude Desktop à plataforma Strateegia, permitindo criar projetos, montar jornadas (mapas) e adicionar pontos de divergência, convergência, dissertação e monitoramento — tudo através de conversa com o Claude. Requer uma API key da sua conta Strateegia.",
   "author": {

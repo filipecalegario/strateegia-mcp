@@ -18,6 +18,9 @@ Runs on Cloudflare Workers. Stateless — the user's Strateegia API key is passe
 | `create_essay_point` | Long-form text with optional peer evaluation |
 | `create_monitor_point` | Track qualitative or quantitative progress |
 | `add_comment_to_question` | Add a response to a divergence question |
+| `like_comment` | Like (curtir) a response in a divergence point |
+| `unlike_comment` | Remove a previously given like on a response |
+| `reply_to_comment` | Reply to an existing response (nested comment) |
 
 ## Development
 
