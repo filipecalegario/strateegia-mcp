@@ -44,6 +44,14 @@ npx wrangler deploy
 
 Your MCP server will be available at `https://strateegia-mcp.<your-account>.workers.dev/mcp`.
 
+## Build the `.mcpb` bundle
+
+```bash
+npm run mcpb:pack
+```
+
+Output: `strateegia.mcpb` na raiz do projeto. Pode ser anexado em uma GitHub Release e baixado pelos usuários. Para mudar o Worker URL apontado pelo bundle, edite a entrada em `server.mcp_config.args` de `mcpb/manifest.json` antes de empacotar.
+
 ## Client Configuration
 
 ### Claude.ai (Web)
@@ -69,9 +77,20 @@ These clients support remote MCP servers with `url` + `headers` directly:
 }
 ```
 
-### Claude Desktop (claude_desktop_config.json)
+### Claude Desktop — Extensão `.mcpb` (recomendado)
 
-Claude Desktop uses `mcp-remote` as a proxy. Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+Instalação sem editar JSON. Ideal para usuário leigo.
+
+1. Baixe o arquivo `strateegia.mcpb` mais recente (ver [Releases](https://github.com/filipecalegario/strateegia-mcp/releases) ou gere localmente com `npm run mcpb:pack`)
+2. Dê duplo clique — o Claude Desktop abre a tela de instalação
+3. Cole sua API key do Strateegia (gere em https://app.strateegia.digital → Configurações → API Keys)
+4. Clique em "Instalar". Pronto.
+
+Requer Claude Desktop ≥ 0.10.0.
+
+### Claude Desktop — manual (claude_desktop_config.json)
+
+Alternativa sem a extensão. Edite `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) ou `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {

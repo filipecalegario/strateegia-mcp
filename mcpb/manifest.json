@@ -1,0 +1,47 @@
+{
+  "manifest_version": "0.1",
+  "name": "strateegia",
+  "display_name": "Strateegia",
+  "version": "1.0.1",
+  "description": "Gerencie projetos, jornadas e pontos do Strateegia direto no Claude Desktop.",
+  "long_description": "Esta extensão conecta o Claude Desktop à plataforma Strateegia, permitindo criar projetos, montar jornadas (mapas) e adicionar pontos de divergência, convergência, dissertação e monitoramento — tudo através de conversa com o Claude. Requer uma API key da sua conta Strateegia.",
+  "author": {
+    "name": "Strateegia",
+    "url": "https://strateegia.digital"
+  },
+  "homepage": "https://strateegia.digital",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/filipecalegario/strateegia-mcp"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server/node_modules/mcp-remote/dist/proxy.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/node_modules/mcp-remote/dist/proxy.js",
+        "https://strateegia-mcp.fcac.workers.dev/mcp",
+        "--header",
+        "Authorization: Bearer ${user_config.api_key}"
+      ]
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Strateegia API Key",
+      "description": "Gere uma API key em https://app.strateegia.digital (Configurações > API Keys) e cole aqui.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "keywords": ["strateegia", "education", "facilitation", "projects", "mcp"]
+}

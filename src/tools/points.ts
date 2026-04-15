@@ -33,6 +33,10 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 				.string()
 				.optional()
 				.describe("Existing tool template UUID (mode B — use list_tool_templates to find one)"),
+			color: z
+				.enum(["PURPLE", "BLUE", "TEAL", "ORANGE", "MAGENTA", "PINK", "YELLOW"])
+				.default("BLUE")
+				.describe("Color for the auto-created tool template (mode A only). Ignored in mode B."),
 			visible: z.boolean().default(true).describe("Whether the point is visible to participants"),
 			introduction: z
 				.string()
@@ -41,7 +45,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 				.optional()
 				.describe("Introductory text shown to participants"),
 		},
-		async ({ map_id, title, position, questions, tool_id, visible, introduction }) => {
+		async ({ map_id, title, position, questions, tool_id, color, visible, introduction }) => {
 			try {
 				if (!questions && !tool_id) {
 					return {
@@ -55,7 +59,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 				if (questions && !tool_id) {
 					const toolBody = {
 						title,
-						color: "BLUE" as const,
+						color,
 						questions: questions.map((q) => ({ question: q })),
 						references: [],
 					};

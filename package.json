@@ -6,7 +6,9 @@
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
 		"type-check": "tsc --noEmit",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"mcpb:install": "cd mcpb/server && npm install --omit=dev --no-audit --no-fund",
+		"mcpb:pack": "npm run mcpb:install && npx --yes @anthropic-ai/mcpb pack mcpb strateegia.mcpb"
 	},
 	"dependencies": {
 		"agents": "^0.9.0",

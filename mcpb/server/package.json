@@ -1,0 +1,10 @@
+{
+  "name": "strateegia-mcpb-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wrapper que conecta o Claude Desktop ao Worker remoto do Strateegia via mcp-remote.",
+  "main": "index.js",
+  "dependencies": {
+    "mcp-remote": "^0.1.38"
+  }
+}
