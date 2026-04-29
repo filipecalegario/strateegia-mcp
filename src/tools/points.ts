@@ -251,7 +251,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 
 	server.tool(
 		"create_monitor_point",
-		"Creates a monitor point (ponto de monitoramento) — for tracking progress and performance indicators. Also called 'monitoring point' in Portuguese Strateegia UI. QUALITATIVE: team reports status (IN_PROGRESS/SUSPENDED/COMPLETED). QUANTITATIVE: tracks a numeric metric toward a goal (set goal, type label, and flow direction UP or DOWN).",
+		"Creates a monitor point (ponto de monitoramento) — for tracking progress and performance indicators. Also called 'monitoring point' in Portuguese Strateegia UI. QUALITATIVE: team reports status (IN_PROGRESS/SUSPENDED/COMPLETED). QUANTITATIVE: tracks a numeric metric toward a goal (set goal, type, and flow direction UP or DOWN).",
 		{
 			map_id: z.string().describe("Map UUID"),
 			name: z.string().min(3).max(100).describe("Point title"),
@@ -261,12 +261,15 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 			monitor_type: z
 				.enum(["QUALITATIVE", "QUANTITATIVE"])
 				.describe("QUALITATIVE=status tracking, QUANTITATIVE=numeric metric"),
-			goal: z.number().optional().describe("Target value (required for QUANTITATIVE)"),
-			type: z.string().optional().describe("Metric label, e.g. 'Revenue' (required for QUANTITATIVE)"),
+			goal: z.number().optional().describe("Target numeric value (required for QUANTITATIVE)"),
+			type: z
+				.enum(["CUMULATIVE"])
+				.optional()
+				.describe("Metric aggregation type. CUMULATIVE=sum of values over time. Required for QUANTITATIVE."),
 			flow: z
 				.enum(["UP", "DOWN"])
 				.optional()
-				.describe("Goal direction: UP=higher is better, DOWN=lower is better (required for QUANTITATIVE)"),
+				.describe("Goal direction: UP=higher is better (mapped to INCREASING), DOWN=lower is better (mapped to DECREASING). Required for QUANTITATIVE."),
 		},
 		async ({ map_id, name, description, position, conclusion_date, monitor_type, goal, type, flow }) => {
 			try {
@@ -275,12 +278,12 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					description,
 					position,
 					conclusion_date,
-					monitor_type,
+					monitor_type: monitor_type.toLowerCase(),
 				};
 				if (monitor_type === "QUANTITATIVE") {
 					body.goal = goal;
 					body.type = type;
-					body.flow = flow;
+					body.flow = flow === "UP" ? "INCREASING" : flow === "DOWN" ? "DECREASING" : undefined;
 				}
 				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/monitor-point`, {
 					method: "POST",
