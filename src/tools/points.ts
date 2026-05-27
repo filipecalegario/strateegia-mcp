@@ -295,4 +295,37 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 			}
 		},
 	);
+
+	server.tool(
+		"update_point_position",
+		"Updates the position of any point (divergence, convergence, essay, or monitor) on a map. Pass the new row and col in the map grid. Works for all point types — the endpoint is point-type agnostic.",
+		{
+			map_id: z.string().describe("Map UUID"),
+			point_id: z.string().describe("Point UUID (any point type)"),
+			row: z.number().int().describe("New row in the map grid"),
+			col: z.number().int().describe("New column in the map grid"),
+		},
+		async ({ map_id, point_id, row, col }) => {
+			try {
+				const data = await strateegiaFetch(
+					getToken(),
+					`/v1/map/${map_id}/point/${point_id}/position`,
+					{
+						method: "PATCH",
+						body: JSON.stringify({ row, col }),
+					},
+				);
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: data ? JSON.stringify(data, null, 2) : `Point ${point_id} moved to (row=${row}, col=${col})`,
+						},
+					],
+				};
+			} catch (err) {
+				return apiErrorToMcpResult(err);
+			}
+		},
+	);
 }
