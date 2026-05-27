@@ -263,9 +263,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 				.describe("QUALITATIVE=status tracking, QUANTITATIVE=numeric metric"),
 			goal: z.number().optional().describe("Target numeric value (required for QUANTITATIVE)"),
 			type: z
-				.enum(["CUMULATIVE"])
+				.enum(["CUMULATIVE", "RECURRING"])
 				.optional()
-				.describe("Metric aggregation type. CUMULATIVE=sum of values over time. Required for QUANTITATIVE."),
+				.describe("Metric aggregation type (required for QUANTITATIVE). CUMULATIVE=values sum over time — use for counts, volumes, R$ totals (e.g. number of contracts, R$ securitized). RECURRING=value is re-measured each period and compared to the goal — use for rates, averages, percentages (e.g. % adoption, average time, CSAT, default rate, NPS)."),
 			flow: z
 				.enum(["UP", "DOWN"])
 				.optional()
