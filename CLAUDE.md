@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Remote MCP (Model Context Protocol) server for the Strateegia platform, deployed on Cloudflare Workers. Exposes 18 tools that map to the Strateegia Projects, Tools, and Users APIs, allowing MCP clients to manage projects, maps, points, comments, and tool templates.
+Remote MCP (Model Context Protocol) server for the Strateegia platform, deployed on Cloudflare Workers. Exposes 19 tools that map to the Strateegia Projects, Tools, and Users APIs, allowing MCP clients to manage projects, maps, points, comments, and tool templates.
 
 ## Commands
 
@@ -24,7 +24,7 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 **Key files:**
 - `src/index.ts` — Worker entrypoint: auth middleware, Origin validation, `StrateegiaAgent` (McpAgent subclass). The `fetch()` override captures the auth token before MCP processing. `init()` registers all tools via domain modules.
 - `src/strateegia-client.ts` — `strateegiaFetch(token, path, init?)` helper that builds URLs, injects Bearer token, and wraps errors as `StrateegiaApiError`.
-- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (6), `comments.ts` (5), `tool-templates.ts` (1). Each file exports a `register*Tools(server, getToken)` function.
+- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (7), `comments.ts` (5), `tool-templates.ts` (1). Each file exports a `register*Tools(server, getToken)` function.
 
 **Strateegia domain hierarchy:** Lab > Project > Map > Point > Content. Point types: Divergence (brainstorming), Convergence (polls/voting), Essay (long-form + evaluation), Monitor (progress tracking).
 
