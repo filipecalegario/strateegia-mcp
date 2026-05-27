@@ -297,6 +297,45 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 	);
 
 	server.tool(
+		"add_monitor_status",
+		"Records a measurement (status) on an existing monitor point (ponto de monitoramento), appending one entry to its tracking history — the way progress is logged over time in the Strateegia UI. The value type determines the monitor kind: pass a NUMBER for QUANTITATIVE monitors (the value measured this period, compared against the point's goal/flow), or one of IN_PROGRESS / SUSPENDED / COMPLETED for QUALITATIVE monitors (the reported state). Optionally attach a message explaining the measurement (e.g. the cause of a delay). Use get_map to find the monitor_point_id and to confirm whether the point is quantitative or qualitative.",
+		{
+			monitor_point_id: z.string().describe("Monitor point UUID (find it via get_map)"),
+			value: z
+				.union([z.enum(["IN_PROGRESS", "SUSPENDED", "COMPLETED"]), z.number()])
+				.describe(
+					"The measurement. For QUANTITATIVE monitors: the numeric value measured this period. For QUALITATIVE monitors: one of IN_PROGRESS, SUSPENDED, COMPLETED.",
+				),
+			message: z.string().optional().describe("Optional note explaining this measurement"),
+		},
+		async ({ monitor_point_id, value, message }) => {
+			try {
+				const monitor_type = typeof value === "number" ? "quantitative" : "qualitative";
+				const body: Record<string, unknown> = { monitor_type, value };
+				if (message !== undefined) body.message = message;
+				const data = await strateegiaFetch(
+					getToken(),
+					`/v1/monitor-point/${monitor_point_id}/status`,
+					{
+						method: "PATCH",
+						body: JSON.stringify(body),
+					},
+				);
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: data ? JSON.stringify(data, null, 2) : `Status added to monitor ${monitor_point_id}`,
+						},
+					],
+				};
+			} catch (err) {
+				return apiErrorToMcpResult(err);
+			}
+		},
+	);
+
+	server.tool(
 		"update_point_position",
 		"Updates the position of any point (divergence, convergence, essay, or monitor) on a map. Pass the new row and col in the map grid. Works for all point types — the endpoint is point-type agnostic.",
 		{
