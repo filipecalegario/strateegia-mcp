@@ -69,6 +69,14 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					const settled = await Promise.allSettled(types.map(fetchAs));
 					const hit = settled.find((r) => r.status === "fulfilled");
 					if (!hit || hit.status !== "fulfilled") {
+						// A wrong type answers 403/404; anything else (401, 429, 5xx) is a real
+						// failure and must surface instead of being reported as "not found".
+						const failure = settled
+							.map((r) => (r.status === "rejected" ? r.reason : null))
+							.find(
+								(e) => e instanceof StrateegiaApiError && e.status !== 403 && e.status !== 404,
+							);
+						if (failure) throw failure;
 						return {
 							content: [
 								{

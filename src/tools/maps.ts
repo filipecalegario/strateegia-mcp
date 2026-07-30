@@ -69,7 +69,8 @@ function summarizeMapContent(content: Dict, map_id: string) {
 
 /** Strips participant content from each entry, keeping the full point configuration. */
 function stripContent(content: Dict) {
-	const out: Dict = {};
+	// Spread first so any field the API adds outside the known containers survives.
+	const out: Dict = { ...content };
 	for (const [container, { contentKey }] of Object.entries(POINT_CONTAINERS)) {
 		const entries = content[container];
 		if (!Array.isArray(entries)) continue;
