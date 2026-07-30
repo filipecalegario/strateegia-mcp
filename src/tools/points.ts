@@ -1,6 +1,16 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { strateegiaFetch, apiErrorToMcpResult } from "../strateegia-client.js";
+import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError } from "../strateegia-client.js";
+
+/** Per-type GET routes. A wrong-type id returns 403, so these can be probed to detect the type. */
+const POINT_ENDPOINTS = {
+	DIVERGENCE: "divergence-point",
+	CONVERGENCE: "convergence-point",
+	ESSAY: "essay-point",
+	MONITOR: "monitor-point",
+} as const;
+
+type PointType = keyof typeof POINT_ENDPOINTS;
 
 const positionSchema = z.object({
 	row: z.number().int().describe("Row in the map grid"),
@@ -17,6 +27,92 @@ const questionSchema = z.object({
 });
 
 export function registerPointTools(server: McpServer, getToken: () => string) {
+	server.tool(
+		"get_point",
+		"Gets one point in full by its id, for any type (divergence, convergence, essay, monitor). Use this instead of get_map when you already know which point you want — it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included — it is paginated behind its own endpoints.",
+		{
+			point_id: z.string().describe("Point UUID (any type)"),
+			point_type: z
+				.enum(["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR"])
+				.optional()
+				.describe("Point type, if known — skips auto-detection"),
+		},
+		async ({ point_id, point_type }) => {
+			try {
+				const token = getToken();
+				const fetchAs = async (type: PointType) => ({
+					type,
+					data: await strateegiaFetch(token, `/v1/${POINT_ENDPOINTS[type]}/${point_id}`),
+				});
+
+				let resolved: { type: PointType; data: unknown };
+				if (point_type) {
+					try {
+						resolved = await fetchAs(point_type);
+					} catch (err) {
+						// A mismatched type also answers 403, so point the caller at auto-detection.
+						if (err instanceof StrateegiaApiError && err.status === 403) {
+							return {
+								content: [
+									{
+										type: "text" as const,
+										text: `Could not read point ${point_id} as ${point_type} (403). Either the point is a different type — retry without point_type to auto-detect — or the authenticated user has no access to it.`,
+									},
+								],
+							};
+						}
+						throw err;
+					}
+				} else {
+					// Probe every route at once; only the matching type returns 2xx.
+					const types = Object.keys(POINT_ENDPOINTS) as PointType[];
+					const settled = await Promise.allSettled(types.map(fetchAs));
+					const hit = settled.find((r) => r.status === "fulfilled");
+					if (!hit || hit.status !== "fulfilled") {
+						// A wrong type answers 403/404; anything else (401, 429, 5xx) is a real
+						// failure and must surface instead of being reported as "not found".
+						const failure = settled
+							.map((r) => (r.status === "rejected" ? r.reason : null))
+							.find(
+								(e) => e instanceof StrateegiaApiError && e.status !== 403 && e.status !== 404,
+							);
+						if (failure) throw failure;
+						return {
+							content: [
+								{
+									type: "text" as const,
+									text: `No point found with id ${point_id}. It may not exist, or the authenticated user may not have access to it.`,
+								},
+							],
+						};
+					}
+					resolved = hit.value;
+				}
+
+				const point: Record<string, unknown> = {
+					point_type: resolved.type,
+					...(resolved.data as Record<string, unknown>),
+				};
+
+				// The monitor endpoint omits the status history; /comments returns it.
+				if (resolved.type === "MONITOR") {
+					try {
+						point.statuses = await strateegiaFetch(
+							token,
+							`/v1/monitor-point/${point_id}/comments`,
+						);
+					} catch {
+						point.statuses = "unavailable (could not load status history)";
+					}
+				}
+
+				return { content: [{ type: "text" as const, text: JSON.stringify(point, null, 2) }] };
+			} catch (err) {
+				return apiErrorToMcpResult(err);
+			}
+		},
+	);
+
 	server.tool(
 		"create_divergence_point",
 		"Creates a divergence point (ponto de debate) — for collecting ideas and responses from participants (brainstorming, discussion). Also called 'debate point' in Portuguese Strateegia UI. Two modes: (A) pass custom questions directly and a tool template is created automatically, or (B) pass a tool_id from an existing template (use list_tool_templates to find one). Mode A is recommended for most cases.",
