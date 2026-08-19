@@ -1,11 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
-import { exchangeApiKeyForJwt } from "./strateegia-client.js";
+import { exchangeApiKeyForJwt, StrateegiaApiError } from "./strateegia-client.js";
 import { registerProjectTools } from "./tools/projects.js";
 import { registerMapTools } from "./tools/maps.js";
 import { registerPointTools } from "./tools/points.js";
 import { registerCommentTools } from "./tools/comments.js";
 import { registerToolTemplateTools } from "./tools/tool-templates.js";
+
+/**
+ * Internal header carrying the JWT from the Worker entrypoint to the Durable Object.
+ * The entrypoint always overwrites it, so a client cannot inject its own token.
+ */
+const JWT_HEADER = "X-Strateegia-Jwt";
 
 export class StrateegiaAgent extends McpAgent<Env> {
 	server = new McpServer({
@@ -17,17 +23,10 @@ export class StrateegiaAgent extends McpAgent<Env> {
 	private jwtToken = "";
 
 	async fetch(request: Request): Promise<Response> {
-		// Exchange the API key for a JWT before MCP processing.
+		// The entrypoint already exchanged the API key and rejected bad ones — a
+		// failure raised in here would surface as a generic transport 500, not a 401.
 		// DOs are single-threaded, so storing on `this` is safe.
-		const apiKey = request.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
-		try {
-			this.jwtToken = await exchangeApiKeyForJwt(apiKey);
-		} catch {
-			return new Response(
-				JSON.stringify({ error: "Invalid API key — could not obtain access token from Strateegia" }),
-				{ status: 401, headers: { "Content-Type": "application/json" } },
-			);
-		}
+		this.jwtToken = request.headers.get(JWT_HEADER) ?? "";
 		return super.fetch(request);
 	}
 
@@ -59,7 +58,7 @@ function isPrivateOrigin(origin: string): boolean {
 }
 
 export default {
-	fetch(request: Request, env: Env, ctx: ExecutionContext) {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		const url = new URL(request.url);
 
 		if (url.pathname === "/mcp") {
@@ -81,7 +80,35 @@ export default {
 				);
 			}
 
-			return StrateegiaAgent.serve("/mcp").fetch(request, env, ctx);
+			// --- Exchange the API key here, at the HTTP layer ---
+			// Doing this inside the Durable Object means a rejected key surfaces as a
+			// generic transport 500 ("Failed to establish WebSocket connection"), which
+			// reads to the user as a server outage rather than a bad key.
+			let jwt: string;
+			try {
+				jwt = await exchangeApiKeyForJwt(authHeader.slice("Bearer ".length).trim());
+			} catch (err) {
+				if (err instanceof StrateegiaApiError && err.status !== 401 && err.status !== 403) {
+					// Rate limits and upstream outages are not "your key is wrong".
+					return new Response(
+						JSON.stringify({ error: `Strateegia rejected the token exchange (HTTP ${err.status})` }),
+						{ status: err.status, headers: { "Content-Type": "application/json" } },
+					);
+				}
+				return new Response(
+					JSON.stringify({
+						error:
+							"Invalid API key — Strateegia would not issue an access token. Check the key configured in your MCP client.",
+					}),
+					{ status: 401, headers: { "Content-Type": "application/json" } },
+				);
+			}
+
+			// set() overwrites, so a client-supplied value can never reach the agent.
+			const headers = new Headers(request.headers);
+			headers.set(JWT_HEADER, jwt);
+
+			return StrateegiaAgent.serve("/mcp").fetch(new Request(request, { headers }), env, ctx);
 		}
 
 		// Health check / discovery
