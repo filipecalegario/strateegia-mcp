@@ -1,26 +1,35 @@
 # strateegia-mcp
 
-Remote MCP server that exposes the [Strateegia](https://strateegia.digital) Projects API to MCP clients (Claude.ai, Claude Desktop, Cursor, ChatGPT, etc.).
+Remote MCP server that exposes the [Strateegia](https://strateegia.digital) Projects API to MCP clients (Claude, Claude Desktop, Claude Code, Cursor, and others).
 
-Runs on Cloudflare Workers. Stateless — the user's Strateegia API key is passed through on every request, never stored.
+Runs on Cloudflare Workers and implements MCP spec **2026-07-28**: stateless, no sessions, no handshake. Clients on the 2025 protocol (including the `mcp-remote` bridge) are still served. The user's Strateegia API key is passed on every request and never stored.
 
-## v1 Tools
+## Tools
 
 | Tool | Description |
 |---|---|
-| `list_projects` | List user's projects (paginated) |
-| `get_project` | Full project details with members and maps |
+| `list_projects` | List the user's projects (journeys), grouped by lab |
+| `get_project` | Project details with members and maps |
 | `create_project` | Create a project in a lab |
-| `list_maps_in_project` | List journey maps in a project |
-| `get_map` | Full map with all points and structure |
-| `create_divergence_point` | Collect ideas/responses (brainstorming) |
-| `create_convergence_point` | Group decision-making via polls |
-| `create_essay_point` | Long-form text with optional peer evaluation |
-| `create_monitor_point` | Track qualitative or quantitative progress |
-| `add_comment_to_question` | Add a response to a divergence question |
-| `like_comment` | Like (curtir) a response in a divergence point |
-| `unlike_comment` | Remove a previously given like on a response |
-| `reply_to_comment` | Reply to an existing response (nested comment) |
+| `list_maps_in_project` | List the journey maps in a project |
+| `create_map` | Create a map inside a project |
+| `get_map` | Points of a map; a compact index by default (`detail`: `summary`, `points`, `full`) |
+| `get_point` | One point in full, any type; detects the type when not given |
+| `create_divergence_point` | Debate point: collect ideas and responses |
+| `update_divergence_point` | Change a debate point's title, introduction or visibility |
+| `add_question_to_divergence_point` | Add a question to a debate point |
+| `create_convergence_point` | Decision point: group poll |
+| `create_essay_point` | Evaluation point: long-form answers with optional peer review |
+| `create_monitor_point` | Monitoring point: qualitative status or numeric KPI (`CUMULATIVE` or `RECURRING`) |
+| `add_monitor_status` | Record a measurement on a monitoring point |
+| `update_point_position` | Move any point on the map grid |
+| `add_comment_to_question` | Answer a debate question |
+| `reply_to_comment` | Reply to an answer |
+| `like_comment` | Like an answer |
+| `unlike_comment` | Remove your like from an answer |
+| `list_tool_templates` | List the debate templates available to the user |
+
+Every tool declares risk annotations (read-only, additive, reversible or overwrite), and failures come back with `isError: true`. No tool deletes anything.
 
 ## Development
 
@@ -29,7 +38,7 @@ npm install
 npm run dev
 ```
 
-This starts Wrangler dev server at `http://localhost:8787`. The MCP endpoint is `/mcp`.
+This starts the Wrangler dev server at `http://localhost:8787`. The MCP endpoint is `/mcp`.
 
 ### Testing with MCP Inspector
 
@@ -37,63 +46,50 @@ This starts Wrangler dev server at `http://localhost:8787`. The MCP endpoint is 
 npx @modelcontextprotocol/inspector
 ```
 
-Enter `http://localhost:8787/mcp` as the server URL. Add an `Authorization: Bearer <your_strateegia_api_key>` header.
+Enter `http://localhost:8787/mcp` as the server URL and add the header `Authorization: Bearer <your_strateegia_api_key>`.
 
 ## Deploy
 
 ```bash
-npx wrangler deploy
+npm run deploy
 ```
 
-Your MCP server will be available at `https://strateegia-mcp.<your-account>.workers.dev/mcp`.
+Wrangler authenticates with `CLOUDFLARE_API_TOKEN` when it is set (it also reads it from `.env`); otherwise it falls back to `npx wrangler login`. The server is served at `https://strateegia-mcp.<your-account>.workers.dev/mcp`.
 
 ## Build the `.mcpb` bundle
 
 ```bash
-npm run mcpb:pack
+npm run bundler
 ```
 
-Output: `strateegia.mcpb` na raiz do projeto. Pode ser anexado em uma GitHub Release e baixado pelos usuários. Para mudar o Worker URL apontado pelo bundle, edite a entrada em `server.mcp_config.args` de `mcpb/manifest.json` antes de empacotar.
+Output: `strateegia.mcpb` at the project root, ready to attach to a GitHub Release. The bundle is a thin `mcp-remote` bridge pointing at the deployed Worker, so it only needs rebuilding when `mcpb/manifest.json` or the `mcp-remote` version changes, not when tools change. To point it at another Worker, edit `server.mcp_config.args` in `mcpb/manifest.json`.
 
-## Client Configuration
+## Client configuration
 
-### Claude.ai (Web)
+Get an API key at https://app.strateegia.digital (Configurações > API Keys). Treat it like a password.
 
-Settings > Connectors > Add custom connector:
-- **URL**: `https://strateegia-mcp.<your-account>.workers.dev/mcp`
-- Add header: `Authorization: Bearer <your_strateegia_api_key>`
+### Claude (web, desktop and mobile): custom connector
 
-### Cursor / Claude Code (mcp.json)
+This connects straight over HTTP, with no local process, and works everywhere you use Claude. It needs the **Request headers** option in the connector dialog, which is in beta and not yet enabled for every organization. If you don't see it, use one of the Claude Desktop options below.
 
-These clients support remote MCP servers with `url` + `headers` directly:
+Customize > Connectors > Add custom connector:
 
-```json
-{
-  "mcpServers": {
-    "strateegia": {
-      "url": "https://strateegia-mcp.<your-account>.workers.dev/mcp",
-      "headers": {
-        "Authorization": "Bearer <your_strateegia_api_key>"
-      }
-    }
-  }
-}
-```
+- **MCP server URL**: `https://strateegia-mcp.<your-account>.workers.dev/mcp`
+- **Authentication**: No sign-in
+- **Request headers**: name `authorization`, value `Bearer <your_strateegia_api_key>` (include the word `Bearer` and the space; Claude sends the value exactly as typed)
 
-### Claude Desktop — Extensão `.mcpb` (recomendado)
+### Claude Desktop: `.mcpb` extension
 
-Instalação sem editar JSON. Ideal para usuário leigo.
+No JSON editing, suited to non-technical users.
 
-1. Baixe o arquivo `strateegia.mcpb` mais recente (ver [Releases](https://github.com/filipecalegario/strateegia-mcp/releases) ou gere localmente com `npm run mcpb:pack`)
-2. Dê duplo clique — o Claude Desktop abre a tela de instalação
-3. Cole sua API key do Strateegia (gere em https://app.strateegia.digital → Configurações → API Keys)
-4. Clique em "Instalar". Pronto.
+1. Download the latest `strateegia.mcpb` (see [Releases](https://github.com/filipecalegario/strateegia-mcp/releases), or build it with `npm run bundler`)
+2. Double-click it; Claude Desktop opens the install screen
+3. Paste your Strateegia API key
+4. Click Install
 
-Requer Claude Desktop ≥ 0.10.0.
+### Claude Desktop: manual (`claude_desktop_config.json`)
 
-### Claude Desktop — manual (claude_desktop_config.json)
-
-Alternativa sem a extensão. Edite `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) ou `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows). `claude_desktop_config.json` launches local processes, so `mcp-remote` acts as the bridge to the remote server:
 
 ```json
 {
@@ -101,7 +97,7 @@ Alternativa sem a extensão. Edite `~/Library/Application Support/Claude/claude_
     "strateegia": {
       "command": "npx",
       "args": [
-        "mcp-remote",
+        "mcp-remote@0.14.3",
         "https://strateegia-mcp.<your-account>.workers.dev/mcp",
         "--header",
         "Authorization: Bearer <your_strateegia_api_key>"
@@ -111,18 +107,43 @@ Alternativa sem a extensão. Edite `~/Library/Application Support/Claude/claude_
 }
 ```
 
+### Claude Code / Cursor (`mcp.json`)
+
+These clients connect to remote servers directly with `url` and `headers` (Claude Code needs `"type": "http"`; Cursor infers it from `url`):
+
+```json
+{
+  "mcpServers": {
+    "strateegia": {
+      "type": "http",
+      "url": "https://strateegia-mcp.<your-account>.workers.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer <your_strateegia_api_key>"
+      }
+    }
+  }
+}
+```
+
 ### Other stdio-only clients
 
-Any client that only supports stdio transport can use the same [mcp-remote](https://www.npmjs.com/package/mcp-remote) approach shown above.
+Use the same [mcp-remote](https://www.npmjs.com/package/mcp-remote) bridge shown in the Claude Desktop manual setup.
 
-## Auth Model
+## Auth model
 
-The user provides their Strateegia API key (PAT) as a Bearer token. The worker:
+The user's Strateegia API key (PAT) is sent as a Bearer token. On every request the Worker:
 
-1. Extracts `Authorization: Bearer <api_key>` from each request
-2. Rejects with 401 if missing
-3. Exchanges the API key for a JWT via `POST /users/v1/auth/api`
-4. Uses the JWT to call the Strateegia Projects API
-5. Propagates any 401/403/422/429 errors from the API
+1. Reads `Authorization: Bearer <api_key>`
+2. Exchanges the key for a short-lived JWT via `POST /users/v1/auth/api`
+3. Passes the JWT to the tools, which call the Strateegia Projects API with it
+4. Propagates API errors to the model as tool errors (`isError: true`)
 
-No credentials are stored. The JWT is ephemeral — it only exists during the request lifecycle. If the API key is revoked in Strateegia, it stops working here automatically.
+This server does not use OAuth. Failed authentication is answered so that clients stop instead of going looking for OAuth:
+
+| Situation | Response |
+|---|---|
+| No `Authorization` header | `401` with `WWW-Authenticate: Bearer` |
+| Header present, key empty or rejected by Strateegia | `403` with a message saying how to fix the key |
+| OAuth discovery routes (`/.well-known/*`, `/register`, `/authorize`, `/token`) | `404` with a JSON error explaining that the server uses an API key |
+
+The `403` is deliberate: on any `401`, `mcp-remote` starts an OAuth flow, fails at client registration and hides the real cause. No credentials are stored, and a key revoked in Strateegia stops working here immediately.
