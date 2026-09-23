@@ -1,16 +1,18 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { strateegiaFetch, apiErrorToMcpResult } from "../strateegia-client.js";
 
 export function registerToolTemplateTools(server: McpServer, getToken: () => string) {
-	server.tool(
+	server.registerTool(
 		"list_tool_templates",
-		"Lists available tool templates for creating divergence points. Returns each template's id, title, description, questions, and color. Use a template id as tool_id in create_divergence_point, or use create_divergence_point with custom questions (which creates a template automatically). Filter by title to search, or set official=true for Strateegia's built-in templates.",
 		{
-			title: z.string().optional().describe("Search by title"),
-			official: z.boolean().optional().default(true).describe("Only official Strateegia templates"),
-			page: z.number().int().min(0).default(0).describe("Zero-based page index"),
-			size: z.number().int().min(1).max(50).default(20).describe("Page size"),
+			description: "Lists available tool templates for creating divergence points. Returns each template's id, title, description, questions, and color. Use a template id as tool_id in create_divergence_point, or use create_divergence_point with custom questions (which creates a template automatically). Filter by title to search, or set official=true for Strateegia's built-in templates.",
+			inputSchema: z.object({
+				title: z.string().optional().describe("Search by title"),
+				official: z.boolean().optional().default(true).describe("Only official Strateegia templates"),
+				page: z.number().int().min(0).default(0).describe("Zero-based page index"),
+				size: z.number().int().min(1).max(50).default(20).describe("Page size"),
+			}),
 		},
 		async ({ title, official, page, size }) => {
 			try {

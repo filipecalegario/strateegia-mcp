@@ -17,14 +17,14 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 
 ## Architecture
 
-**Runtime:** Cloudflare Workers with Durable Objects (required by `agents` SDK, but no state is persisted — the architecture is functionally stateless).
+**Runtime:** Cloudflare Workers, stateless, targeting MCP spec **2026-07-28** (no `initialize` handshake, no `Mcp-Session-Id`, no Durable Object). Built on `createMcpHandler` from `agents/mcp` with the MCP SDK v2 (`@modelcontextprotocol/server`). 2025-era clients (such as the `mcp-remote` bridge in the `.mcpb`) are still served through the handler's default `legacy: "stateless"` fallback. See `spec/007-mcp-2026-07-28.md`.
 
-**Auth flow:** Client sends `Authorization: Bearer <token>` -> Worker validates presence -> McpAgent captures token per-request -> Tool handlers pass it to `strateegiaFetch()` -> Strateegia API validates it. Token never stored, never logged.
+**Auth flow:** Client sends `Authorization: Bearer <api_key>` -> Worker validates presence and Origin -> Worker exchanges the key for a JWT (`exchangeApiKeyForJwt`, once per request; a rejected key returns a clean 401) -> JWT is passed to the handler as request-scoped `authInfo` -> the server factory builds a fresh `McpServer` whose tools close over the JWT -> Tool handlers pass it to `strateegiaFetch()`. Token never stored, never logged.
 
 **Key files:**
-- `src/index.ts` — Worker entrypoint: auth middleware, Origin validation, `StrateegiaAgent` (McpAgent subclass). The `fetch()` override captures the auth token before MCP processing. `init()` registers all tools via domain modules.
+- `src/index.ts`: Worker entrypoint. Auth check, Origin validation, key exchange, and `buildServer(jwt)`, which registers all tools via domain modules. The MCP handler is created once at module level; `allowedOriginHostnames: "*"` because Origin is already validated in the entrypoint.
 - `src/strateegia-client.ts` — `strateegiaFetch(token, path, init?)` helper that builds URLs, injects Bearer token, and wraps errors as `StrateegiaApiError`.
-- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (8), `comments.ts` (5), `tool-templates.ts` (1). Each file exports a `register*Tools(server, getToken)` function.
+- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (8), `comments.ts` (5), `tool-templates.ts` (1). Each file exports a `register*Tools(server, getToken)` function that uses `server.registerTool(name, { description, inputSchema: z.object({...}) }, handler)`. The SDK v2 `McpServer` has no `server.tool()`.
 
 **Strateegia domain hierarchy:** Lab > Project > Map > Point > Content. Point types: Divergence (brainstorming), Convergence (polls/voting), Essay (long-form + evaluation), Monitor (progress tracking).
 

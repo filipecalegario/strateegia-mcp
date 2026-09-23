@@ -1,4 +1,4 @@
-// Generated manually — run `wrangler types` to regenerate with full runtime types
-interface Env {
-	MCP_OBJECT: DurableObjectNamespace<import("./src/index").StrateegiaAgent>;
-}
+// Generated manually. The Worker has no bindings since the move to the stateless
+// MCP handler (no Durable Object), so Env is empty.
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+interface Env {}
