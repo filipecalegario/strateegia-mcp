@@ -34,6 +34,9 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 
 - Tool descriptions are dense — the LLM reads them as context. Explain what, when, and what it returns.
 - Zod schemas use only fields the user would reasonably set. API-internal fields (e.g. `approved`) get hardcoded defaults.
+- Every tool declares `annotations` from `src/tools/annotations.ts` (`READ_ONLY`, `ADDITIVE`, `REVERSIBLE_SET`, `OVERWRITE`). Always set all four hints: the MCP defaults (`destructiveHint: true`, `openWorldHint: true`) would flag even read tools as destructive.
+- Tool failures return `isError: true`: use `apiErrorToMcpResult(err)` for API errors and `toolError(text)` for failures detected inside the tool. Never return a failure as plain content.
+- Tool responses use compact `JSON.stringify(data)` (no indentation); indentation only costs tokens.
 - All API errors propagate status codes: 401 (bad token), 403 (no permission), 422 (invalid body), 429 (rate limit).
 - Strateegia API base: `https://api.strateegia.digital/projects`. Swagger: `https://api.strateegia.digital/projects/swagger-ui/index.html`.
 - Never log or store the Authorization header value.

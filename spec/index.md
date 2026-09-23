@@ -24,7 +24,7 @@ endpoint.
 | 004 | [Checkpoint e aviso](004-checkpoint-and-notice-points.md) | `create_checkpoint_point`, `create_notice_point` | Média | Not started |
 | 005 | [Edição genérica](005-update-point.md) | `update_point` | Média | Not started |
 | 006 | [Leituras leves](006-lightweight-reads.md) | — (otimiza existentes) | Baixa | Not started |
-| 007 | [Conformidade com a spec MCP 2026-07-28](007-mcp-2026-07-28.md) | runtime sem estado + todas as 20 tools | Alta | In progress (etapa 1 em revisão) |
+| 007 | [Conformidade com a spec MCP 2026-07-28](007-mcp-2026-07-28.md) | runtime sem estado + todas as 20 tools | Alta | In progress (etapa 1 concluída; etapa 2 em revisão) |
 
 Status possíveis: `Not started` · `In progress` · `In review` · `Done`
 

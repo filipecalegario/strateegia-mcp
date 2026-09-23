@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError } from "../strateegia-client.js";
+import { ADDITIVE, OVERWRITE, READ_ONLY, REVERSIBLE_SET } from "./annotations.js";
+import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError, toolError } from "../strateegia-client.js";
 
 /** Per-type GET routes. A wrong-type id returns 403, so these can be probed to detect the type. */
 const POINT_ENDPOINTS = {
@@ -31,6 +32,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"get_point",
 		{
 			description: "Gets one point in full by its id, for any type (divergence, convergence, essay, monitor). Use this instead of get_map when you already know which point you want — it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included — it is paginated behind its own endpoints.",
+			annotations: READ_ONLY,
 			inputSchema: z.object({
 				point_id: z.string().describe("Point UUID (any type)"),
 				point_type: z
@@ -54,14 +56,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					} catch (err) {
 						// A mismatched type also answers 403, so point the caller at auto-detection.
 						if (err instanceof StrateegiaApiError && err.status === 403) {
-							return {
-								content: [
-									{
-										type: "text" as const,
-										text: `Could not read point ${point_id} as ${point_type} (403). Either the point is a different type — retry without point_type to auto-detect — or the authenticated user has no access to it.`,
-									},
-								],
-							};
+							return toolError(`Could not read point ${point_id} as ${point_type} (403). Either the point is a different type — retry without point_type to auto-detect — or the authenticated user has no access to it.`);
 						}
 						throw err;
 					}
@@ -79,14 +74,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 								(e) => e instanceof StrateegiaApiError && e.status !== 403 && e.status !== 404,
 							);
 						if (failure) throw failure;
-						return {
-							content: [
-								{
-									type: "text" as const,
-									text: `No point found with id ${point_id}. It may not exist, or the authenticated user may not have access to it.`,
-								},
-							],
-						};
+						return toolError(`No point found with id ${point_id}. It may not exist, or the authenticated user may not have access to it.`);
 					}
 					resolved = hit.value;
 				}
@@ -108,7 +96,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					}
 				}
 
-				return { content: [{ type: "text" as const, text: JSON.stringify(point, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(point) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -119,6 +107,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"create_divergence_point",
 		{
 			description: "Creates a divergence point (ponto de debate) — for collecting ideas and responses from participants (brainstorming, discussion). Also called 'debate point' in Portuguese Strateegia UI. Two modes: (A) pass custom questions directly and a tool template is created automatically, or (B) pass a tool_id from an existing template (use list_tool_templates to find one). Mode A is recommended for most cases.",
+			annotations: ADDITIVE,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
 				title: z.string().min(1).max(100).describe("Point title (also used as tool template name in mode A)"),
@@ -148,9 +137,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		async ({ map_id, title, position, questions, tool_id, color, visible, introduction }) => {
 			try {
 				if (!questions && !tool_id) {
-					return {
-						content: [{ type: "text" as const, text: "Error: provide either 'questions' (to create a new template) or 'tool_id' (to use an existing template)" }],
-					};
+					return toolError("Error: provide either 'questions' (to create a new template) or 'tool_id' (to use an existing template)");
 				}
 
 				let resolvedToolId = tool_id;
@@ -183,7 +170,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					method: "POST",
 					body: JSON.stringify(body),
 				});
-				return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -194,6 +181,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"update_divergence_point",
 		{
 			description: "Updates an existing divergence point (ponto de debate). Pass only the fields you want to change — title, introduction, and/or visibility. Each field triggers a separate PATCH call to the API.",
+			annotations: OVERWRITE,
 			inputSchema: z.object({
 				divergence_point_id: z.string().describe("Divergence point UUID"),
 				title: z.string().min(3).max(100).optional().describe("New title"),
@@ -229,12 +217,12 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 				}
 
 				if (results.length === 0) {
-					return { content: [{ type: "text" as const, text: "No fields to update. Pass at least one of: title, introduction, visible." }] };
+					return toolError("No fields to update. Pass at least one of: title, introduction, visible.");
 				}
 
 				// Return the updated point
 				const updated = await strateegiaFetch(getToken(), base);
-				return { content: [{ type: "text" as const, text: JSON.stringify(updated, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(updated) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -245,6 +233,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"create_convergence_point",
 		{
 			description: "Creates a convergence point (ponto de decisao) — for collaborative group decision-making via polls. Also called 'decision point' in Portuguese Strateegia UI. Define questions with options that participants vote on. Each question must have at least one option. Set a closing_date (ISO 8601) for when voting ends.",
+			annotations: ADDITIVE,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
 				name: z.string().min(1).describe("Point title"),
@@ -274,7 +263,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					method: "POST",
 					body: JSON.stringify(body),
 				});
-				return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -285,6 +274,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"create_essay_point",
 		{
 			description: "Creates an essay point (ponto de avaliacao) — for long-form text responses and optional peer evaluation. Also called 'evaluation point' in Portuguese Strateegia UI. Participants write on a theme. Types: ESSAY (free writing), CHALLENGING_SITUATION (scenario analysis), SUBJECTIVE_QUESTION (open question). Set evaluation modes to enable peer review.",
+			annotations: ADDITIVE,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
 				essay_name: z.string().min(1).describe("Point title"),
@@ -348,7 +338,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					method: "POST",
 					body: JSON.stringify(body),
 				});
-				return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -359,6 +349,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"create_monitor_point",
 		{
 			description: "Creates a monitor point (ponto de monitoramento) — for tracking progress and performance indicators. Also called 'monitoring point' in Portuguese Strateegia UI. QUALITATIVE: team reports status (IN_PROGRESS/SUSPENDED/COMPLETED). QUANTITATIVE: tracks a numeric metric toward a goal (set goal, type, and flow direction UP or DOWN).",
+			annotations: ADDITIVE,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
 				name: z.string().min(3).max(100).describe("Point title"),
@@ -397,7 +388,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					method: "POST",
 					body: JSON.stringify(body),
 				});
-				return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -408,6 +399,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"add_monitor_status",
 		{
 			description: "Records a measurement (status) on an existing monitor point (ponto de monitoramento), appending one entry to its tracking history — the way progress is logged over time in the Strateegia UI. The value type determines the monitor kind: pass a NUMBER for QUANTITATIVE monitors (the value measured this period, compared against the point's goal/flow), or one of IN_PROGRESS / SUSPENDED / COMPLETED for QUALITATIVE monitors (the reported state). Optionally attach a message explaining the measurement (e.g. the cause of a delay). Use get_map to find the monitor_point_id and to confirm whether the point is quantitative or qualitative.",
+			annotations: ADDITIVE,
 			inputSchema: z.object({
 				monitor_point_id: z.string().describe("Monitor point UUID (find it via get_map)"),
 				value: z
@@ -435,7 +427,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					content: [
 						{
 							type: "text" as const,
-							text: data ? JSON.stringify(data, null, 2) : `Status added to monitor ${monitor_point_id}`,
+							text: data ? JSON.stringify(data) : `Status added to monitor ${monitor_point_id}`,
 						},
 					],
 				};
@@ -449,6 +441,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		"update_point_position",
 		{
 			description: "Updates the position of any point (divergence, convergence, essay, or monitor) on a map. Pass the new row and col in the map grid. Works for all point types — the endpoint is point-type agnostic.",
+			annotations: REVERSIBLE_SET,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
 				point_id: z.string().describe("Point UUID (any point type)"),
@@ -470,7 +463,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 					content: [
 						{
 							type: "text" as const,
-							text: data ? JSON.stringify(data, null, 2) : `Point ${point_id} moved to (row=${row}, col=${col})`,
+							text: data ? JSON.stringify(data) : `Point ${point_id} moved to (row=${row}, col=${col})`,
 						},
 					],
 				};
