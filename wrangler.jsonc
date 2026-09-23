@@ -6,22 +6,20 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "strateegia-mcp",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-03-10",
+	"compatibility_date": "2026-09-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"migrations": [
 		{
 			"new_sqlite_classes": ["StrateegiaAgent"],
 			"tag": "v1"
+		},
+		{
+			// MCP 2026-07-28 is stateless: the per-session Durable Object is no longer used.
+			// It only ever held transport session data, so deleting it loses nothing.
+			"deleted_classes": ["StrateegiaAgent"],
+			"tag": "v2"
 		}
 	],
-	"durable_objects": {
-		"bindings": [
-			{
-				"class_name": "StrateegiaAgent",
-				"name": "MCP_OBJECT"
-			}
-		]
-	},
 	"observability": {
 		"enabled": true
 	}

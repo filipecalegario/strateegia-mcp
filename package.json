@@ -12,12 +12,14 @@
 		"bundler": "npm run mcpb:pack"
 	},
 	"dependencies": {
-		"agents": "^0.9.0",
+		"@modelcontextprotocol/sdk": "1.30.0",
+		"@modelcontextprotocol/server": "2.0.0",
+		"agents": "0.24.0",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20260408.1",
+		"@cloudflare/workers-types": "^5.20260923.1",
 		"typescript": "6.0.2",
-		"wrangler": "^4.79.0"
+		"wrangler": "^4.137.0"
 	}
 }

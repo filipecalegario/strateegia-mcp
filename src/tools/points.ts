@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError } from "../strateegia-client.js";
 
@@ -27,15 +27,17 @@ const questionSchema = z.object({
 });
 
 export function registerPointTools(server: McpServer, getToken: () => string) {
-	server.tool(
+	server.registerTool(
 		"get_point",
-		"Gets one point in full by its id, for any type (divergence, convergence, essay, monitor). Use this instead of get_map when you already know which point you want — it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included — it is paginated behind its own endpoints.",
 		{
-			point_id: z.string().describe("Point UUID (any type)"),
-			point_type: z
-				.enum(["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR"])
-				.optional()
-				.describe("Point type, if known — skips auto-detection"),
+			description: "Gets one point in full by its id, for any type (divergence, convergence, essay, monitor). Use this instead of get_map when you already know which point you want — it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included — it is paginated behind its own endpoints.",
+			inputSchema: z.object({
+				point_id: z.string().describe("Point UUID (any type)"),
+				point_type: z
+					.enum(["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR"])
+					.optional()
+					.describe("Point type, if known — skips auto-detection"),
+			}),
 		},
 		async ({ point_id, point_type }) => {
 			try {
@@ -113,33 +115,35 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"create_divergence_point",
-		"Creates a divergence point (ponto de debate) — for collecting ideas and responses from participants (brainstorming, discussion). Also called 'debate point' in Portuguese Strateegia UI. Two modes: (A) pass custom questions directly and a tool template is created automatically, or (B) pass a tool_id from an existing template (use list_tool_templates to find one). Mode A is recommended for most cases.",
 		{
-			map_id: z.string().describe("Map UUID"),
-			title: z.string().min(1).max(100).describe("Point title (also used as tool template name in mode A)"),
-			position: positionSchema,
-			questions: z
-				.array(z.string().min(1))
-				.min(1)
-				.optional()
-				.describe("Custom questions for participants (mode A — creates a tool template automatically)"),
-			tool_id: z
-				.string()
-				.optional()
-				.describe("Existing tool template UUID (mode B — use list_tool_templates to find one)"),
-			color: z
-				.enum(["PURPLE", "BLUE", "TEAL", "ORANGE", "MAGENTA", "PINK", "YELLOW"])
-				.default("BLUE")
-				.describe("Color for the auto-created tool template (mode A only). Ignored in mode B."),
-			visible: z.boolean().default(true).describe("Whether the point is visible to participants"),
-			introduction: z
-				.string()
-				.min(3)
-				.max(20000)
-				.optional()
-				.describe("Introductory text shown to participants"),
+			description: "Creates a divergence point (ponto de debate) — for collecting ideas and responses from participants (brainstorming, discussion). Also called 'debate point' in Portuguese Strateegia UI. Two modes: (A) pass custom questions directly and a tool template is created automatically, or (B) pass a tool_id from an existing template (use list_tool_templates to find one). Mode A is recommended for most cases.",
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				title: z.string().min(1).max(100).describe("Point title (also used as tool template name in mode A)"),
+				position: positionSchema,
+				questions: z
+					.array(z.string().min(1))
+					.min(1)
+					.optional()
+					.describe("Custom questions for participants (mode A — creates a tool template automatically)"),
+				tool_id: z
+					.string()
+					.optional()
+					.describe("Existing tool template UUID (mode B — use list_tool_templates to find one)"),
+				color: z
+					.enum(["PURPLE", "BLUE", "TEAL", "ORANGE", "MAGENTA", "PINK", "YELLOW"])
+					.default("BLUE")
+					.describe("Color for the auto-created tool template (mode A only). Ignored in mode B."),
+				visible: z.boolean().default(true).describe("Whether the point is visible to participants"),
+				introduction: z
+					.string()
+					.min(3)
+					.max(20000)
+					.optional()
+					.describe("Introductory text shown to participants"),
+			}),
 		},
 		async ({ map_id, title, position, questions, tool_id, color, visible, introduction }) => {
 			try {
@@ -186,14 +190,16 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"update_divergence_point",
-		"Updates an existing divergence point (ponto de debate). Pass only the fields you want to change — title, introduction, and/or visibility. Each field triggers a separate PATCH call to the API.",
 		{
-			divergence_point_id: z.string().describe("Divergence point UUID"),
-			title: z.string().min(3).max(100).optional().describe("New title"),
-			introduction: z.string().min(3).max(20000).optional().describe("Introductory text shown to participants"),
-			visible: z.boolean().optional().describe("Whether the point is visible to participants"),
+			description: "Updates an existing divergence point (ponto de debate). Pass only the fields you want to change — title, introduction, and/or visibility. Each field triggers a separate PATCH call to the API.",
+			inputSchema: z.object({
+				divergence_point_id: z.string().describe("Divergence point UUID"),
+				title: z.string().min(3).max(100).optional().describe("New title"),
+				introduction: z.string().min(3).max(20000).optional().describe("Introductory text shown to participants"),
+				visible: z.boolean().optional().describe("Whether the point is visible to participants"),
+			}),
 		},
 		async ({ divergence_point_id, title, introduction, visible }) => {
 			try {
@@ -235,21 +241,23 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"create_convergence_point",
-		"Creates a convergence point (ponto de decisao) — for collaborative group decision-making via polls. Also called 'decision point' in Portuguese Strateegia UI. Define questions with options that participants vote on. Each question must have at least one option. Set a closing_date (ISO 8601) for when voting ends.",
 		{
-			map_id: z.string().describe("Map UUID"),
-			name: z.string().min(1).describe("Point title"),
-			position: positionSchema,
-			questions: z.array(questionSchema).min(1).max(10).describe("Poll questions with options"),
-			closing_date: z.string().describe("Voting deadline (ISO 8601 datetime, e.g. 2025-12-31T23:59:00Z)"),
-			visible: z.boolean().default(true).describe("Whether the point is visible to participants"),
-			allow_multiple_answers: z
-				.boolean()
-				.optional()
-				.default(false)
-				.describe("Allow selecting multiple options per question"),
+			description: "Creates a convergence point (ponto de decisao) — for collaborative group decision-making via polls. Also called 'decision point' in Portuguese Strateegia UI. Define questions with options that participants vote on. Each question must have at least one option. Set a closing_date (ISO 8601) for when voting ends.",
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				name: z.string().min(1).describe("Point title"),
+				position: positionSchema,
+				questions: z.array(questionSchema).min(1).max(10).describe("Poll questions with options"),
+				closing_date: z.string().describe("Voting deadline (ISO 8601 datetime, e.g. 2025-12-31T23:59:00Z)"),
+				visible: z.boolean().default(true).describe("Whether the point is visible to participants"),
+				allow_multiple_answers: z
+					.boolean()
+					.optional()
+					.default(false)
+					.describe("Allow selecting multiple options per question"),
+			}),
 		},
 		async ({ map_id, name, position, questions, closing_date, visible, allow_multiple_answers }) => {
 			try {
@@ -273,28 +281,30 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"create_essay_point",
-		"Creates an essay point (ponto de avaliacao) — for long-form text responses and optional peer evaluation. Also called 'evaluation point' in Portuguese Strateegia UI. Participants write on a theme. Types: ESSAY (free writing), CHALLENGING_SITUATION (scenario analysis), SUBJECTIVE_QUESTION (open question). Set evaluation modes to enable peer review.",
 		{
-			map_id: z.string().describe("Map UUID"),
-			essay_name: z.string().min(1).describe("Point title"),
-			position: positionSchema,
-			essay_theme: z.string().min(1).describe("Theme or prompt for the essay"),
-			essay_language: z.string().default("PT_BR").describe("Language code: PT_BR, EN_US, DE_DE, ZH_CN, ES_ES, FR_FR"),
-			type: z
-				.enum(["ESSAY", "CHALLENGING_SITUATION", "SUBJECTIVE_QUESTION"])
-				.default("ESSAY")
-				.describe("ESSAY=free writing, CHALLENGING_SITUATION=scenario analysis, SUBJECTIVE_QUESTION=open question"),
-			visible: z.boolean().default(true).describe("Whether the point is visible"),
-			user_evaluation_mode: z.boolean().default(false).describe("Enable peer evaluation of essays"),
-			incognito_mode: z.boolean().default(false).describe("Hide author identity"),
-			individual_mode: z.boolean().default(false).describe("Participants can only see their own essays"),
-			multiple_response_mode: z.boolean().default(false).describe("Allow multiple submissions"),
-			support_texts: z.array(z.string()).default([]).describe("Reference texts shown to participants"),
-			criteria_ids: z.array(z.string()).default([]).describe("Evaluation criteria UUIDs"),
-			closing_date: z.string().optional().describe("Submission deadline (ISO 8601)"),
-			thematic: z.string().optional().describe("Thematic category"),
+			description: "Creates an essay point (ponto de avaliacao) — for long-form text responses and optional peer evaluation. Also called 'evaluation point' in Portuguese Strateegia UI. Participants write on a theme. Types: ESSAY (free writing), CHALLENGING_SITUATION (scenario analysis), SUBJECTIVE_QUESTION (open question). Set evaluation modes to enable peer review.",
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				essay_name: z.string().min(1).describe("Point title"),
+				position: positionSchema,
+				essay_theme: z.string().min(1).describe("Theme or prompt for the essay"),
+				essay_language: z.string().default("PT_BR").describe("Language code: PT_BR, EN_US, DE_DE, ZH_CN, ES_ES, FR_FR"),
+				type: z
+					.enum(["ESSAY", "CHALLENGING_SITUATION", "SUBJECTIVE_QUESTION"])
+					.default("ESSAY")
+					.describe("ESSAY=free writing, CHALLENGING_SITUATION=scenario analysis, SUBJECTIVE_QUESTION=open question"),
+				visible: z.boolean().default(true).describe("Whether the point is visible"),
+				user_evaluation_mode: z.boolean().default(false).describe("Enable peer evaluation of essays"),
+				incognito_mode: z.boolean().default(false).describe("Hide author identity"),
+				individual_mode: z.boolean().default(false).describe("Participants can only see their own essays"),
+				multiple_response_mode: z.boolean().default(false).describe("Allow multiple submissions"),
+				support_texts: z.array(z.string()).default([]).describe("Reference texts shown to participants"),
+				criteria_ids: z.array(z.string()).default([]).describe("Evaluation criteria UUIDs"),
+				closing_date: z.string().optional().describe("Submission deadline (ISO 8601)"),
+				thematic: z.string().optional().describe("Thematic category"),
+			}),
 		},
 		async ({
 			map_id,
@@ -345,27 +355,29 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"create_monitor_point",
-		"Creates a monitor point (ponto de monitoramento) — for tracking progress and performance indicators. Also called 'monitoring point' in Portuguese Strateegia UI. QUALITATIVE: team reports status (IN_PROGRESS/SUSPENDED/COMPLETED). QUANTITATIVE: tracks a numeric metric toward a goal (set goal, type, and flow direction UP or DOWN).",
 		{
-			map_id: z.string().describe("Map UUID"),
-			name: z.string().min(3).max(100).describe("Point title"),
-			description: z.string().min(3).max(1000).describe("What is being monitored"),
-			position: positionSchema,
-			conclusion_date: z.string().describe("Monitoring deadline (ISO 8601)"),
-			monitor_type: z
-				.enum(["QUALITATIVE", "QUANTITATIVE"])
-				.describe("QUALITATIVE=status tracking, QUANTITATIVE=numeric metric"),
-			goal: z.number().optional().describe("Target numeric value (required for QUANTITATIVE)"),
-			type: z
-				.enum(["CUMULATIVE", "RECURRING"])
-				.optional()
-				.describe("Metric aggregation type (required for QUANTITATIVE). CUMULATIVE=values sum over time — use for counts, volumes, R$ totals (e.g. number of contracts, R$ securitized). RECURRING=value is re-measured each period and compared to the goal — use for rates, averages, percentages (e.g. % adoption, average time, CSAT, default rate, NPS)."),
-			flow: z
-				.enum(["UP", "DOWN"])
-				.optional()
-				.describe("Goal direction: UP=higher is better (mapped to INCREASING), DOWN=lower is better (mapped to DECREASING). Required for QUANTITATIVE."),
+			description: "Creates a monitor point (ponto de monitoramento) — for tracking progress and performance indicators. Also called 'monitoring point' in Portuguese Strateegia UI. QUALITATIVE: team reports status (IN_PROGRESS/SUSPENDED/COMPLETED). QUANTITATIVE: tracks a numeric metric toward a goal (set goal, type, and flow direction UP or DOWN).",
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				name: z.string().min(3).max(100).describe("Point title"),
+				description: z.string().min(3).max(1000).describe("What is being monitored"),
+				position: positionSchema,
+				conclusion_date: z.string().describe("Monitoring deadline (ISO 8601)"),
+				monitor_type: z
+					.enum(["QUALITATIVE", "QUANTITATIVE"])
+					.describe("QUALITATIVE=status tracking, QUANTITATIVE=numeric metric"),
+				goal: z.number().optional().describe("Target numeric value (required for QUANTITATIVE)"),
+				type: z
+					.enum(["CUMULATIVE", "RECURRING"])
+					.optional()
+					.describe("Metric aggregation type (required for QUANTITATIVE). CUMULATIVE=values sum over time — use for counts, volumes, R$ totals (e.g. number of contracts, R$ securitized). RECURRING=value is re-measured each period and compared to the goal — use for rates, averages, percentages (e.g. % adoption, average time, CSAT, default rate, NPS)."),
+				flow: z
+					.enum(["UP", "DOWN"])
+					.optional()
+					.describe("Goal direction: UP=higher is better (mapped to INCREASING), DOWN=lower is better (mapped to DECREASING). Required for QUANTITATIVE."),
+			}),
 		},
 		async ({ map_id, name, description, position, conclusion_date, monitor_type, goal, type, flow }) => {
 			try {
@@ -392,17 +404,19 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"add_monitor_status",
-		"Records a measurement (status) on an existing monitor point (ponto de monitoramento), appending one entry to its tracking history — the way progress is logged over time in the Strateegia UI. The value type determines the monitor kind: pass a NUMBER for QUANTITATIVE monitors (the value measured this period, compared against the point's goal/flow), or one of IN_PROGRESS / SUSPENDED / COMPLETED for QUALITATIVE monitors (the reported state). Optionally attach a message explaining the measurement (e.g. the cause of a delay). Use get_map to find the monitor_point_id and to confirm whether the point is quantitative or qualitative.",
 		{
-			monitor_point_id: z.string().describe("Monitor point UUID (find it via get_map)"),
-			value: z
-				.union([z.enum(["IN_PROGRESS", "SUSPENDED", "COMPLETED"]), z.number()])
-				.describe(
-					"The measurement. For QUANTITATIVE monitors: the numeric value measured this period. For QUALITATIVE monitors: one of IN_PROGRESS, SUSPENDED, COMPLETED.",
-				),
-			message: z.string().optional().describe("Optional note explaining this measurement"),
+			description: "Records a measurement (status) on an existing monitor point (ponto de monitoramento), appending one entry to its tracking history — the way progress is logged over time in the Strateegia UI. The value type determines the monitor kind: pass a NUMBER for QUANTITATIVE monitors (the value measured this period, compared against the point's goal/flow), or one of IN_PROGRESS / SUSPENDED / COMPLETED for QUALITATIVE monitors (the reported state). Optionally attach a message explaining the measurement (e.g. the cause of a delay). Use get_map to find the monitor_point_id and to confirm whether the point is quantitative or qualitative.",
+			inputSchema: z.object({
+				monitor_point_id: z.string().describe("Monitor point UUID (find it via get_map)"),
+				value: z
+					.union([z.enum(["IN_PROGRESS", "SUSPENDED", "COMPLETED"]), z.number()])
+					.describe(
+						"The measurement. For QUANTITATIVE monitors: the numeric value measured this period. For QUALITATIVE monitors: one of IN_PROGRESS, SUSPENDED, COMPLETED.",
+					),
+				message: z.string().optional().describe("Optional note explaining this measurement"),
+			}),
 		},
 		async ({ monitor_point_id, value, message }) => {
 			try {
@@ -431,14 +445,16 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"update_point_position",
-		"Updates the position of any point (divergence, convergence, essay, or monitor) on a map. Pass the new row and col in the map grid. Works for all point types — the endpoint is point-type agnostic.",
 		{
-			map_id: z.string().describe("Map UUID"),
-			point_id: z.string().describe("Point UUID (any point type)"),
-			row: z.number().int().describe("New row in the map grid"),
-			col: z.number().int().describe("New column in the map grid"),
+			description: "Updates the position of any point (divergence, convergence, essay, or monitor) on a map. Pass the new row and col in the map grid. Works for all point types — the endpoint is point-type agnostic.",
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				point_id: z.string().describe("Point UUID (any point type)"),
+				row: z.number().int().describe("New row in the map grid"),
+				col: z.number().int().describe("New column in the map grid"),
+			}),
 		},
 		async ({ map_id, point_id, row, col }) => {
 			try {

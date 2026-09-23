@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { strateegiaFetch, apiErrorToMcpResult } from "../strateegia-client.js";
 
@@ -90,12 +90,14 @@ function stripContent(content: Dict) {
 }
 
 export function registerMapTools(server: McpServer, getToken: () => string) {
-	server.tool(
+	server.registerTool(
 		"create_map",
-		"Creates a new journey map (mapa) inside a project (jornada). A map is a visual flow where you add points: debate (divergence), decision (convergence), evaluation (essay), monitoring (monitor). Every project needs at least one map before you can add points.",
 		{
-			project_id: z.string().describe("Project UUID"),
-			title: z.string().max(35).default("").describe("Map title (max 35 chars)"),
+			description: "Creates a new journey map (mapa) inside a project (jornada). A map is a visual flow where you add points: debate (divergence), decision (convergence), evaluation (essay), monitoring (monitor). Every project needs at least one map before you can add points.",
+			inputSchema: z.object({
+				project_id: z.string().describe("Project UUID"),
+				title: z.string().max(35).default("").describe("Map title (max 35 chars)"),
+			}),
 		},
 		async ({ project_id, title }) => {
 			try {
@@ -110,11 +112,13 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"list_maps_in_project",
-		"Lists all journey maps in a project. Maps are visual flows of connected points (divergence, convergence, essay, monitor). Returns each map's id and metadata. Use get_map to see full structure.",
 		{
-			project_id: z.string().describe("Project UUID"),
+			description: "Lists all journey maps in a project. Maps are visual flows of connected points (divergence, convergence, essay, monitor). Returns each map's id and metadata. Use get_map to see full structure.",
+			inputSchema: z.object({
+				project_id: z.string().describe("Project UUID"),
+			}),
 		},
 		async ({ project_id }) => {
 			try {
@@ -130,17 +134,19 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 		},
 	);
 
-	server.tool(
+	server.registerTool(
 		"get_map",
-		"Gets the points of a journey map (divergence, convergence, essay, monitor, checkpoint, notice) with their positions on the row/col grid. Defaults to a compact index, because a busy map's full content can run to megabytes and exceed client response limits. detail levels: 'summary' (default) = one row per point (id, type, title, position) plus counts of the omitted participant content — start here to find the point you want; 'points' = full configuration of every point (goal, flow, questions, dates...) with participant content still omitted; 'full' = everything including every response, answer, comment and status (can be very large — prefer get_point for a single point).",
 		{
-			map_id: z.string().describe("Map UUID"),
-			detail: z
-				.enum(["summary", "points", "full"])
-				.default("summary")
-				.describe(
-					"summary=index of points only (smallest), points=full point config without participant content, full=raw response with all content (largest)",
-				),
+			description: "Gets the points of a journey map (divergence, convergence, essay, monitor, checkpoint, notice) with their positions on the row/col grid. Defaults to a compact index, because a busy map's full content can run to megabytes and exceed client response limits. detail levels: 'summary' (default) = one row per point (id, type, title, position) plus counts of the omitted participant content — start here to find the point you want; 'points' = full configuration of every point (goal, flow, questions, dates...) with participant content still omitted; 'full' = everything including every response, answer, comment and status (can be very large — prefer get_point for a single point).",
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				detail: z
+					.enum(["summary", "points", "full"])
+					.default("summary")
+					.describe(
+						"summary=index of points only (smallest), points=full point config without participant content, full=raw response with all content (largest)",
+					),
+			}),
 		},
 		async ({ map_id, detail }) => {
 			try {
