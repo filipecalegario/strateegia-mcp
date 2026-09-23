@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { READ_ONLY } from "./annotations.js";
 import { strateegiaFetch, apiErrorToMcpResult } from "../strateegia-client.js";
 
 export function registerToolTemplateTools(server: McpServer, getToken: () => string) {
@@ -7,6 +8,7 @@ export function registerToolTemplateTools(server: McpServer, getToken: () => str
 		"list_tool_templates",
 		{
 			description: "Lists available tool templates for creating divergence points. Returns each template's id, title, description, questions, and color. Use a template id as tool_id in create_divergence_point, or use create_divergence_point with custom questions (which creates a template automatically). Filter by title to search, or set official=true for Strateegia's built-in templates.",
+			annotations: READ_ONLY,
 			inputSchema: z.object({
 				title: z.string().optional().describe("Search by title"),
 				official: z.boolean().optional().default(true).describe("Only official Strateegia templates"),
@@ -25,7 +27,7 @@ export function registerToolTemplateTools(server: McpServer, getToken: () => str
 					undefined,
 					"tools",
 				);
-				return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}

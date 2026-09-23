@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { ADDITIVE, READ_ONLY } from "./annotations.js";
 import { strateegiaFetch, apiErrorToMcpResult } from "../strateegia-client.js";
 
 /**
@@ -94,6 +95,7 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 		"create_map",
 		{
 			description: "Creates a new journey map (mapa) inside a project (jornada). A map is a visual flow where you add points: debate (divergence), decision (convergence), evaluation (essay), monitoring (monitor). Every project needs at least one map before you can add points.",
+			annotations: ADDITIVE,
 			inputSchema: z.object({
 				project_id: z.string().describe("Project UUID"),
 				title: z.string().max(35).default("").describe("Map title (max 35 chars)"),
@@ -105,7 +107,7 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 					method: "POST",
 					body: JSON.stringify({ title }),
 				});
-				return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -116,6 +118,7 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 		"list_maps_in_project",
 		{
 			description: "Lists all journey maps in a project. Maps are visual flows of connected points (divergence, convergence, essay, monitor). Returns each map's id and metadata. Use get_map to see full structure.",
+			annotations: READ_ONLY,
 			inputSchema: z.object({
 				project_id: z.string().describe("Project UUID"),
 			}),
@@ -127,7 +130,7 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 					maps?: unknown[];
 				};
 				const maps = data?.maps ?? [];
-				return { content: [{ type: "text" as const, text: JSON.stringify(maps, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(maps) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}
@@ -138,6 +141,7 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 		"get_map",
 		{
 			description: "Gets the points of a journey map (divergence, convergence, essay, monitor, checkpoint, notice) with their positions on the row/col grid. Defaults to a compact index, because a busy map's full content can run to megabytes and exceed client response limits. detail levels: 'summary' (default) = one row per point (id, type, title, position) plus counts of the omitted participant content — start here to find the point you want; 'points' = full configuration of every point (goal, flow, questions, dates...) with participant content still omitted; 'full' = everything including every response, answer, comment and status (can be very large — prefer get_point for a single point).",
+			annotations: READ_ONLY,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
 				detail: z
@@ -153,11 +157,11 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/content`);
 				const content = asDict(data);
 				if (!content || detail === "full") {
-					return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+					return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 				}
 				const shaped =
 					detail === "summary" ? summarizeMapContent(content, map_id) : stripContent(content);
-				return { content: [{ type: "text" as const, text: JSON.stringify(shaped, null, 2) }] };
+				return { content: [{ type: "text" as const, text: JSON.stringify(shaped) }] };
 			} catch (err) {
 				return apiErrorToMcpResult(err);
 			}

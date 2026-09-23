@@ -63,17 +63,20 @@ export async function strateegiaFetch(
 	return response.json();
 }
 
-export function apiErrorToMcpResult(err: unknown): { content: { type: "text"; text: string }[] } {
+export type ToolErrorResult = { content: { type: "text"; text: string }[]; isError: true };
+
+/**
+ * A tool-level failure. `isError: true` tells the model the call failed; without it
+ * an API error reads as an ordinary successful result.
+ */
+export function toolError(text: string): ToolErrorResult {
+	return { content: [{ type: "text", text }], isError: true };
+}
+
+export function apiErrorToMcpResult(err: unknown): ToolErrorResult {
 	if (err instanceof StrateegiaApiError) {
-		return {
-			content: [
-				{
-					type: "text",
-					text: `Error ${err.status}: ${err.body}`,
-				},
-			],
-		};
+		return toolError(`Error ${err.status}: ${err.body}`);
 	}
 	const message = err instanceof Error ? err.message : String(err);
-	return { content: [{ type: "text", text: `Error: ${message}` }] };
+	return toolError(`Error: ${message}`);
 }
