@@ -53,6 +53,7 @@ Templates: `list_tool_templates`
 
 ## Fora de escopo (decisões tomadas)
 
+- **Funcionalidades específicas de um projeto** (decidido em 24/09/2026). O MCP expõe a plataforma Strateegia de forma genérica, sem tools, telas ou fluxos feitos sob medida para um cliente ou jornada, como o painel de KPIs do BNB. Por isso a etapa 4 da spec 007 foi descartada.
 - **Deleção** — nenhuma tool apaga pontos, mapas ou projetos. Decisão deliberada: a
   operação é irreversível e os pontos contêm respostas de participantes. A API suporta
   (`DELETE /v1/monitor-point/{id}` etc.), mas não será exposta por ora. A única exceção
