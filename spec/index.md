@@ -24,7 +24,7 @@ endpoint.
 | 004 | [Checkpoint e aviso](004-checkpoint-and-notice-points.md) | `create_checkpoint_point`, `create_notice_point` | Média | Not started |
 | 005 | [Edição genérica](005-update-point.md) | `update_point` | Média | Not started |
 | 006 | [Leituras leves](006-lightweight-reads.md) | — (otimiza existentes) | Baixa | Not started |
-| 007 | [Conformidade com a spec MCP 2026-07-28](007-mcp-2026-07-28.md) | runtime sem estado + todas as 20 tools | Alta | In progress (etapas 1 e 2 em produção; etapa 3 em revisão) |
+| 007 | [Conformidade com a spec MCP 2026-07-28](007-mcp-2026-07-28.md) | runtime sem estado + todas as 20 tools | Alta | Done (etapas 1 a 3 em produção; etapa 4 descartada) |
 
 Status possíveis: `Not started` · `In progress` · `In review` · `Done`
 
@@ -53,6 +53,7 @@ Templates: `list_tool_templates`
 
 ## Fora de escopo (decisões tomadas)
 
+- **Funcionalidades específicas de um projeto** (decidido em 24/09/2026). O MCP expõe a plataforma Strateegia de forma genérica, sem tools, telas ou fluxos feitos sob medida para um cliente ou jornada, como o painel de KPIs do BNB. Por isso a etapa 4 da spec 007 foi descartada.
 - **Deleção** — nenhuma tool apaga pontos, mapas ou projetos. Decisão deliberada: a
   operação é irreversível e os pontos contêm respostas de participantes. A API suporta
   (`DELETE /v1/monitor-point/{id}` etc.), mas não será exposta por ora. A única exceção
