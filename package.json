@@ -8,7 +8,7 @@
 		"type-check": "tsc --noEmit",
 		"cf-typegen": "wrangler types",
 		"mcpb:install": "cd mcpb/server && npm install --omit=dev --no-audit --no-fund",
-		"mcpb:pack": "npm run mcpb:install && npx --yes @anthropic-ai/mcpb pack mcpb strateegia.mcpb",
+		"mcpb:pack": "npm run mcpb:install && npx --yes @anthropic-ai/mcpb@2.1.2 pack mcpb strateegia.mcpb",
 		"bundler": "npm run mcpb:pack"
 	},
 	"dependencies": {
