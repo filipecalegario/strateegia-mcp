@@ -1,10 +1,18 @@
-const BASE_URLS = {
-	projects: "https://api.strateegia.digital/projects",
-	tools: "https://api.strateegia.digital/tools",
-	users: "https://api.strateegia.digital/users",
-} as const;
+import { env } from "cloudflare:workers";
 
-type StrateegiaService = keyof typeof BASE_URLS;
+const DEFAULT_API_URL = "https://api.strateegia.digital";
+
+type StrateegiaService = "projects" | "tools" | "users";
+
+/**
+ * Base URL of one Strateegia service. STRATEEGIA_API_URL points the worker at another
+ * environment (the dev deploy uses https://api.dev.strateegia.digital); the service
+ * paths are the same in every environment.
+ */
+export function serviceUrl(service: StrateegiaService): string {
+	const root = (env.STRATEEGIA_API_URL || DEFAULT_API_URL).replace(/\/+$/, "");
+	return `${root}/${service}`;
+}
 
 export class StrateegiaApiError extends Error {
 	constructor(
@@ -21,7 +29,7 @@ export class StrateegiaApiError extends Error {
  * Called once per incoming MCP request.
  */
 export async function exchangeApiKeyForJwt(apiKey: string): Promise<string> {
-	const response = await fetch(`${BASE_URLS.users}/v1/auth/api`, {
+	const response = await fetch(`${serviceUrl("users")}/v1/auth/api`, {
 		method: "POST",
 		headers: { "x-api-key": apiKey },
 	});
@@ -45,7 +53,7 @@ export async function strateegiaFetch(
 	init?: RequestInit,
 	service: StrateegiaService = "projects",
 ): Promise<unknown> {
-	const url = `${BASE_URLS[service]}${path}`;
+	const url = `${serviceUrl(service)}${path}`;
 	const headers: Record<string, string> = {
 		Authorization: `Bearer ${bearerToken}`,
 		"Content-Type": "application/json",

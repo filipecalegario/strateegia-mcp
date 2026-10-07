@@ -22,5 +22,22 @@
 	],
 	"observability": {
 		"enabled": true
+	},
+	"vars": {
+		// Root of the Strateegia API that the tools call.
+		"STRATEEGIA_API_URL": "https://api.strateegia.digital"
+	},
+	"env": {
+		// `npm run deploy:dev` publishes a separate worker (strateegia-mcp-dev) that talks to
+		// the dev environment, so dev sessions and data never reach production.
+		"dev": {
+			"name": "strateegia-mcp-dev",
+			"vars": {
+				"STRATEEGIA_API_URL": "https://api.dev.strateegia.digital"
+			},
+			"observability": {
+				"enabled": true
+			}
+		}
 	}
 }

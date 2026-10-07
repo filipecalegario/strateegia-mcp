@@ -1,6 +1,6 @@
 import { McpServer, type AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp";
-import { exchangeApiKeyForJwt, StrateegiaApiError } from "./strateegia-client.js";
+import { exchangeApiKeyForJwt, serviceUrl, StrateegiaApiError } from "./strateegia-client.js";
 import { registerProjectTools } from "./tools/projects.js";
 import { registerMapTools } from "./tools/maps.js";
 import { registerPointTools } from "./tools/points.js";
@@ -83,6 +83,15 @@ function rejectedCredentials(detail: string): Response {
 	return jsonResponse(403, { error: `${detail} ${KEY_HELP}` });
 }
 
+/**
+ * A JWT is three base64url segments joined by dots, whose header starts with `{"`
+ * (encoded `eyJ`). Strateegia API keys are 50 alphanumeric characters with no dots
+ * (`CredentialService.generateApiKey` in sp-service-user), so the two cannot be confused.
+ */
+function looksLikeJwt(credential: string): boolean {
+	return /^eyJ[\w-]*\.[\w-]+\.[\w-]+$/.test(credential);
+}
+
 const OAUTH_DISCOVERY_PATHS = ["/register", "/authorize", "/token"];
 
 function isOAuthDiscovery(pathname: string): boolean {
@@ -113,8 +122,8 @@ export default {
 			const authHeader = request.headers.get("Authorization");
 			if (!authHeader) return missingCredentials();
 			// Header values arrive trimmed, so an empty key shows up as a bare "Bearer".
-			const apiKey = /^Bearer\s+(\S.*)$/i.exec(authHeader)?.[1]?.trim();
-			if (!apiKey) {
+			const credential = /^Bearer\s+(\S.*)$/i.exec(authHeader)?.[1]?.trim();
+			if (!credential) {
 				return rejectedCredentials(
 					"The Authorization header has no API key (expected: Bearer <api_key>).",
 				);
@@ -126,10 +135,14 @@ export default {
 				return jsonResponse(403, { error: "Forbidden: private network origin" });
 			}
 
-			// --- Exchange the API key for a JWT before any MCP processing ---
+			// --- Resolve the credential to a JWT before any MCP processing ---
+			// Services inside the platform (sp-service-llm) forward the user's session JWT,
+			// which the API already accepts, so only API keys need the exchange. A bad or
+			// expired JWT is not checked here: the API answers 401 and the tool reports it.
+			const isSession = looksLikeJwt(credential);
 			let jwt: string;
 			try {
-				jwt = await exchangeApiKeyForJwt(apiKey);
+				jwt = isSession ? credential : await exchangeApiKeyForJwt(credential);
 			} catch (err) {
 				if (err instanceof StrateegiaApiError && err.status !== 401 && err.status !== 403) {
 					// Rate limits and upstream outages are not "your key is wrong".
@@ -143,7 +156,11 @@ export default {
 			}
 
 			// The JWT travels as request-scoped authInfo; nothing is stored between requests.
-			const authInfo: AuthInfo = { token: jwt, clientId: "strateegia-api-key", scopes: [] };
+			const authInfo: AuthInfo = {
+				token: jwt,
+				clientId: isSession ? "strateegia-session" : "strateegia-api-key",
+				scopes: [],
+			};
 			return mcpHandler.fetch(request, { authInfo });
 		}
 
@@ -162,7 +179,7 @@ export default {
 				version: "2.0.0",
 				mcp_endpoint: "/mcp",
 				protocol: "2026-07-28 (stateless; 2025-era clients served via legacy fallback)",
-				docs: "https://api.strateegia.digital/projects/swagger-ui/index.html",
+				docs: `${serviceUrl("projects")}/swagger-ui/index.html`,
 			});
 		}
 
