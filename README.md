@@ -4,6 +4,8 @@ Remote MCP server that exposes the [Strateegia](https://strateegia.digital) Proj
 
 Runs on Cloudflare Workers and implements MCP spec **2026-07-28**: stateless, no sessions, no handshake. Clients on the 2025 protocol (including the `mcp-remote` bridge) are still served. The user's Strateegia API key is passed on every request and never stored.
 
+Services inside the Strateegia platform can send the user's session JWT instead of an API key (`Authorization: Bearer <jwt>`); the server uses it directly and skips the key exchange.
+
 ## Tools
 
 | Tool | Description |
@@ -49,6 +51,8 @@ npx @modelcontextprotocol/inspector
 Enter `http://localhost:8787/mcp` as the server URL and add the header `Authorization: Bearer <your_strateegia_api_key>`.
 
 ## Deploy
+
+The worker reads the Strateegia API root from the `STRATEEGIA_API_URL` var in `wrangler.jsonc`. `npm run deploy` publishes `strateegia-mcp` against production; `npm run deploy:dev` publishes a separate `strateegia-mcp-dev` worker against `https://api.dev.strateegia.digital`. For local work against dev, use `npm run dev:env-dev`.
 
 ```bash
 npm run deploy

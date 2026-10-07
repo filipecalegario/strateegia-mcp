@@ -4,7 +4,9 @@
 	"private": true,
 	"scripts": {
 		"dev": "wrangler dev",
+		"dev:env-dev": "wrangler dev --env dev",
 		"deploy": "wrangler deploy",
+		"deploy:dev": "wrangler deploy --env dev",
 		"type-check": "tsc --noEmit",
 		"cf-typegen": "wrangler types",
 		"mcpb:install": "cd mcpb/server && npm install --omit=dev --no-audit --no-fund",

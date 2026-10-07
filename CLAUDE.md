@@ -10,7 +10,9 @@ Remote MCP (Model Context Protocol) server for the Strateegia platform, deployed
 
 ```bash
 npm run dev          # Start local Wrangler dev server (http://localhost:8787/mcp)
-npm run deploy       # Deploy to Cloudflare Workers
+npm run deploy       # Deploy to Cloudflare Workers (production API)
+npm run deploy:dev   # Deploy strateegia-mcp-dev, which talks to api.dev.strateegia.digital
+npm run dev:env-dev  # Local dev server against the dev API
 npm run type-check   # TypeScript type checking
 npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 ```
@@ -19,7 +21,7 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 
 **Runtime:** Cloudflare Workers, stateless, targeting MCP spec **2026-07-28** (no `initialize` handshake, no `Mcp-Session-Id`, no Durable Object). Built on `createMcpHandler` from `agents/mcp` with the MCP SDK v2 (`@modelcontextprotocol/server`). 2025-era clients (such as the `mcp-remote` bridge in the `.mcpb`) are still served through the handler's default `legacy: "stateless"` fallback. See `spec/007-mcp-2026-07-28.md`.
 
-**Auth flow:** Client sends `Authorization: Bearer <api_key>` -> Worker validates presence and Origin -> Worker exchanges the key for a JWT (`exchangeApiKeyForJwt`, once per request) -> JWT is passed to the handler as request-scoped `authInfo` -> the server factory builds a fresh `McpServer` whose tools close over the JWT -> Tool handlers pass it to `strateegiaFetch()`. Token never stored, never logged.
+**Auth flow:** Client sends `Authorization: Bearer <api_key>` -> Worker validates presence and Origin -> Worker exchanges the key for a JWT (`exchangeApiKeyForJwt`, once per request) -> JWT is passed to the handler as request-scoped `authInfo` -> the server factory builds a fresh `McpServer` whose tools close over the JWT -> Tool handlers pass it to `strateegiaFetch()`. Token never stored, never logged. Platform services (sp-service-llm) may instead send the user's session JWT directly; `looksLikeJwt` detects it and skips the exchange, since API keys are 50 alphanumeric characters with no dots.
 
 **Auth failure responses (deliberate, see spec 007 stage 3):** no `Authorization` header returns 401 with `WWW-Authenticate: Bearer`; a header with an empty or rejected key returns **403**, not 401, because on any 401 `mcp-remote` starts an OAuth flow, fails at Dynamic Client Registration and hides the real message. OAuth discovery routes (`/.well-known/*`, `/register`, `/authorize`, `/token`) return a 404 JSON error saying the server uses an API key. Keep this behaviour when touching auth.
 
@@ -40,5 +42,5 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 - Tool failures return `isError: true`: use `apiErrorToMcpResult(err)` for API errors and `toolError(text)` for failures detected inside the tool. Never return a failure as plain content.
 - Tool responses use compact `JSON.stringify(data)` (no indentation); indentation only costs tokens.
 - All API errors propagate status codes: 401 (bad token), 403 (no permission), 422 (invalid body), 429 (rate limit).
-- Strateegia API base: `https://api.strateegia.digital/projects`. Swagger: `https://api.strateegia.digital/projects/swagger-ui/index.html`.
+- Strateegia API base comes from the `STRATEEGIA_API_URL` var (`wrangler.jsonc`): `https://api.strateegia.digital` in production, `https://api.dev.strateegia.digital` in the `dev` env. Build URLs with `serviceUrl(service)`, never hardcode the host. Swagger: `<base>/projects/swagger-ui/index.html`.
 - Never log or store the Authorization header value.
