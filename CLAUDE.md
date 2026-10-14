@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Remote MCP (Model Context Protocol) server for the Strateegia platform, deployed on Cloudflare Workers. Exposes 21 tools that map to the Strateegia Projects, Tools, and Users APIs, allowing MCP clients to manage projects, maps, points, comments, and tool templates.
+Remote MCP (Model Context Protocol) server for the Strateegia platform, deployed on Cloudflare Workers. Exposes 24 tools that map to the Strateegia Projects, Tools, and Users APIs, allowing MCP clients to manage projects, maps, points, comments, and tool templates.
 
 ## Commands
 
@@ -28,11 +28,15 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 **Key files:**
 - `src/index.ts`: Worker entrypoint. Auth check, Origin validation, key exchange, and `buildServer(jwt)`, which registers all tools via domain modules. The MCP handler is created once at module level; `allowedOriginHostnames: "*"` because Origin is already validated in the entrypoint.
 - `src/strateegia-client.ts` — `strateegiaFetch(token, path, init?)` helper that builds URLs, injects Bearer token, and wraps errors as `StrateegiaApiError`.
-- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (8), `comments.ts` (5), `tool-templates.ts` (1), `point-content.ts` (1). Each file exports a `register*Tools(server, getToken)` function that uses `server.registerTool(name, { description, inputSchema: z.object({...}) }, handler)`. The SDK v2 `McpServer` has no `server.tool()`.
+- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (9), `comments.ts` (5), `tool-templates.ts` (1), `point-content.ts` (1), `point-editing.ts` (2); `point-types.ts` holds the shared type detection (`resolvePoint`). Each file exports a `register*Tools(server, getToken)` function that uses `server.registerTool(name, { description, inputSchema: z.object({...}) }, handler)`. The SDK v2 `McpServer` has no `server.tool()`.
 
 **Strateegia domain hierarchy:** Lab > Project > Map > Point > Content. Point types: Divergence (brainstorming), Convergence (polls/voting), Essay (long-form + evaluation), Monitor (progress tracking).
 
 **Reading points without blowing the response limit:** `/v1/map/{id}/content` embeds every point *with* its participant content, so a busy map easily reaches megabytes and can exceed client limits. `get_map` therefore defaults to `detail: "summary"` (an index of id/type/title/position plus counts) and offers `"points"` (full config, content stripped) and `"full"` (raw). To read a single point, use `get_point` — the per-type routes (`/v1/{divergence,convergence,essay,monitor}-point/{id}`) answer 403 for a mismatched id, which is what makes type auto-detection possible. Monitor points are the exception to "one point, one call": their endpoint reports only `current_status`, so `get_point` also fetches `/v1/monitor-point/{id}/comments` for the full status history.
+
+**Editing points:** `update_point` (`src/tools/point-editing.ts`) edits every point type; `FIELD_SUPPORT` says which fields each type takes, and a field the type does not take is rejected before any call. Monitor uses one partial `PATCH`; meeting (`/v1/checkpoint/{id}`) and notice only have a whole-object `PUT`, so the current point is read and the unchanged values sent back (the notice always goes with `send_email: false`, so an edit never re-sends it). Essay modes are booleans mapped to `/{mode}/enable|disable`, applied before the closing date because the API only accepts an essay closing date while `end_time_mode` is on. Several fields mean several calls; a failure midway reports what was applied. `close_point` is separate (`IRREVERSIBLE`): the API has no reopen, and a meeting can only be closed once its date has arrived.
+
+**API quirks:** date-times go in UTC without offset (`toApiDateTime` converts any ISO 8601 input; the API rejects `-03:00`). Several write endpoints answer 200 with an empty body, so `strateegiaFetch` returns `null` for any empty body, not only 204.
 
 **Reading participation:** `get_point_content` (`src/tools/point-content.ts`) returns what participants produced, which `get_point` leaves out. It probes the same per-type routes plus `/v1/checkpoint/{id}`, then dispatches: debate comments are reachable only per question, so it lists `/v1/divergence-point/{id}/question` and pages `/question/{qid}/comment` for each (or one, with `question_id`); checkpoints page `/v1/checkpoint/{id}/comment`; essay `/responses` and monitor `/comments` return everything at once, so they are paged locally; convergence has no results endpoint, but each option carries `count_vote` and the point `answer_count`, so aggregated votes come from the point itself (individual votes are not exposed). Output is one envelope `{point_id, point_type, items, page, size, total, has_more}`, authors reduced to name (plus `is_assistant` when true). Default page size is 10 and essay evaluation feedback is opt-in (`include_evaluation_feedback`), because both dominate response size and the in-platform chat has a token budget per chat room.
 
@@ -40,7 +44,7 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 
 - Tool descriptions are dense — the LLM reads them as context. Explain what, when, and what it returns.
 - Zod schemas use only fields the user would reasonably set. API-internal fields (e.g. `approved`) get hardcoded defaults.
-- Every tool declares `annotations` from `src/tools/annotations.ts` (`READ_ONLY`, `ADDITIVE`, `REVERSIBLE_SET`, `OVERWRITE`). Always set all four hints: the MCP defaults (`destructiveHint: true`, `openWorldHint: true`) would flag even read tools as destructive.
+- Every tool declares `annotations` from `src/tools/annotations.ts` (`READ_ONLY`, `ADDITIVE`, `REVERSIBLE_SET`, `OVERWRITE`, `IRREVERSIBLE`). Always set all four hints: the MCP defaults (`destructiveHint: true`, `openWorldHint: true`) would flag even read tools as destructive.
 - Tool failures return `isError: true`: use `apiErrorToMcpResult(err)` for API errors and `toolError(text)` for failures detected inside the tool. Never return a failure as plain content.
 - Tool responses use compact `JSON.stringify(data)` (no indentation); indentation only costs tokens.
 - All API errors propagate status codes: 401 (bad token), 403 (no permission), 422 (invalid body), 429 (rate limit).

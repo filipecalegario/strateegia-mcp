@@ -1,6 +1,6 @@
 # 005 — `update_point`: edição genérica
 
-**Status:** Not started
+**Status:** In review
 **Prioridade:** Média (Tier 5)
 **Tools novas:** `update_point` (absorve `update_divergence_point`)
 
@@ -60,9 +60,27 @@ para não haver duas formas de fazer a mesma coisa.
 
 ## Critérios de aceitação
 
-- [ ] Edita monitor, convergência, dissertação e divergência
-- [ ] Detecção automática de tipo, com `point_type` como atalho
-- [ ] Modos de dissertação expostos como booleanos, não como pares de endpoints
-- [ ] Semântica de `updateMonitorPointInfo` (parcial vs total) confirmada
-- [ ] `update_divergence_point` absorvido, sem duplicidade
-- [ ] Falha parcial relatada com clareza
+- [x] Edita monitor, convergência, dissertação e divergência
+- [x] Detecção automática de tipo, com `point_type` como atalho
+- [x] Modos de dissertação expostos como booleanos, não como pares de endpoints
+- [x] Semântica de `updateMonitorPointInfo` (parcial vs total) confirmada
+- [x] `update_divergence_point` absorvido, sem duplicidade
+- [x] Falha parcial relatada com clareza
+
+## Implementação (14/10/2026)
+
+Tools `update_point` (`OVERWRITE`) e `close_point` (`IRREVERSIBLE`, anotação nova) em `src/tools/point-editing.ts`. A detecção de tipo passou para `src/tools/point-types.ts` (`resolvePoint`), compartilhada com `get_point_content`. `update_divergence_point` foi removida e `skill/SKILL.md` passou a usar `update_point`.
+
+**Campos por tipo** (`FIELD_SUPPORT`): `title` (debate, monitor, aviso); `description` (introdução do debate, descrição do monitor, assunto do encontro, texto do aviso); `visible` (todos menos encontro, que não tem rota de visibilidade); `closing_date` (decisão, dissertação, data de conclusão do monitor); `opening_date` e `meeting_place` (encontro); `goal` e `color` (monitor); `anonymous` (debate e dissertação); `individual_mode`, `single_shot_mode`, `end_time_mode` (dissertação). Campo que o tipo não aceita é recusado **antes** de qualquer chamada, com a lista dos aceitos.
+
+**O que a spec OpenAPI e o teste ao vivo mostraram:**
+
+- **Monitor:** `PATCH /v1/monitor-point/{id}` é **parcial** (nenhum campo obrigatório). Verificado: mudar título, meta, cor e conclusão preservou a descrição. Uma chamada só leva todos os campos.
+- **Encontro e aviso** existem só como `PUT` de objeto inteiro (`UpdateCheckpointDTO`, `UpdateNoticePointDTO`), então a tool lê o ponto e devolve os valores que não mudaram. O aviso vai sempre com `send_email: false`, para uma edição não reenviar o e-mail. Os dois também ganharam o `GET` (`/v1/checkpoint/{id}`, `/v1/notice-point/{id}`) na detecção de tipo.
+- **Dissertação:** hoje são **4 modos** com par `enable`/`disable` (`end-time-mode`, `incognito-mode`, `individual-mode`, `single-shot-mode`), não os 8 listados acima. A API **só aceita mudar a data de encerramento com `end_time_mode` ligado** ("Is not possible update closing date because end time mode is not activated"); por isso os modos são aplicados antes da data, e `end_time_mode: true` com `closing_date` funciona numa chamada só. O `GET` da dissertação não devolve `single_shot_mode`, embora a alteração seja aceita.
+- **Debate:** o anonimato é um `PATCH /incognito-mode` com corpo, diferente da dissertação. A descrição do campo avisa que desligar o anonimato revela o autor de todas as contribuições.
+- **Encerrar** (`PUT .../close`) não tem volta, por isso virou tool própria. Encerrar de novo uma decisão já encerrada não dá erro. Um encontro só pode ser encerrado depois que a data dele chega: antes disso a API responde 409 ("The checkpoint must be open to close it"). Verificado: um encontro criado para dois minutos depois foi recusado antes da hora e encerrado com sucesso depois dela.
+- **Respostas vazias:** vários endpoints de escrita respondem 200 com corpo vazio. O `strateegiaFetch` tratava só o 204 e quebrava na leitura do JSON, relatando erro numa alteração que tinha acontecido (verificado: a decisão foi encerrada e a tool disse que falhou). Corrigido no cliente, para todas as tools.
+
+**Verificado ao vivo em dev:** edição parcial de encontro (data e local preservados) e de aviso (texto preservado); recusa de campo inválido e de data inválida sem alterar nada; PATCH parcial de monitor; data e encerramento de decisão; modos de dissertação ligando e desligando; encerramento de decisão e de encontro; título, introdução e anonimato de debate; `get_point_content` depois da refatoração.
+

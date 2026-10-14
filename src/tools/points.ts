@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { ADDITIVE, OVERWRITE, READ_ONLY, REVERSIBLE_SET } from "./annotations.js";
-import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError, toolError } from "../strateegia-client.js";
+import { ADDITIVE, READ_ONLY, REVERSIBLE_SET } from "./annotations.js";
+import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError, toolError, toApiDateTime } from "../strateegia-client.js";
 
 /** Per-type GET routes. A wrong-type id returns 403, so these can be probed to detect the type. */
 const POINT_ENDPOINTS = {
@@ -178,58 +178,6 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 	);
 
 	server.registerTool(
-		"update_divergence_point",
-		{
-			description: "Updates an existing divergence point (ponto de debate). Pass only the fields you want to change — title, introduction, and/or visibility. Each field triggers a separate PATCH call to the API.",
-			annotations: OVERWRITE,
-			inputSchema: z.object({
-				divergence_point_id: z.string().describe("Divergence point UUID"),
-				title: z.string().min(3).max(100).optional().describe("New title"),
-				introduction: z.string().min(3).max(20000).optional().describe("Introductory text shown to participants"),
-				visible: z.boolean().optional().describe("Whether the point is visible to participants"),
-			}),
-		},
-		async ({ divergence_point_id, title, introduction, visible }) => {
-			try {
-				const results: string[] = [];
-				const base = `/v1/divergence-point/${divergence_point_id}`;
-
-				if (title !== undefined) {
-					await strateegiaFetch(getToken(), `${base}/title`, {
-						method: "PATCH",
-						body: JSON.stringify({ title }),
-					});
-					results.push(`title updated to "${title}"`);
-				}
-				if (introduction !== undefined) {
-					await strateegiaFetch(getToken(), `${base}/introduction`, {
-						method: "PATCH",
-						body: JSON.stringify({ introduction }),
-					});
-					results.push("introduction updated");
-				}
-				if (visible !== undefined) {
-					await strateegiaFetch(getToken(), `${base}/visibility`, {
-						method: "PATCH",
-						body: JSON.stringify({ visible }),
-					});
-					results.push(`visibility set to ${visible}`);
-				}
-
-				if (results.length === 0) {
-					return toolError("No fields to update. Pass at least one of: title, introduction, visible.");
-				}
-
-				// Return the updated point
-				const updated = await strateegiaFetch(getToken(), base);
-				return { content: [{ type: "text" as const, text: JSON.stringify(updated) }] };
-			} catch (err) {
-				return apiErrorToMcpResult(err);
-			}
-		},
-	);
-
-	server.registerTool(
 		"create_convergence_point",
 		{
 			description: "Creates a convergence point (ponto de decisao) — for collaborative group decision-making via polls. Also called 'decision point' in Portuguese Strateegia UI. Define questions with options that participants vote on. Each question must have at least one option. Set a closing_date (ISO 8601) for when voting ends.",
@@ -387,6 +335,75 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/monitor-point`, {
 					method: "POST",
 					body: JSON.stringify(body),
+				});
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
+			} catch (err) {
+				return apiErrorToMcpResult(err);
+			}
+		},
+	);
+
+	server.registerTool(
+		"create_checkpoint_point",
+		{
+			description: "Creates a meeting point (ponto de encontro, called checkpoint in the API) to schedule an in-person or online meeting: subject, date and time, and where it happens. Participants can comment on it. A meeting point has no title; the description identifies it in the map.",
+			annotations: ADDITIVE,
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				description: z.string().min(3).max(1000).describe("Meeting subject and agenda; shown as the point's label"),
+				position: positionSchema,
+				opening_date: z
+					.string()
+					.describe("Meeting date and time, ISO 8601 with the time zone offset (e.g. 2026-10-20T14:00:00-03:00 for 14h in Brasília); sent to the API in UTC"),
+				meeting_place: z
+					.string()
+					.max(500)
+					.optional()
+					.describe("Address or videoconference link"),
+				visible: z.boolean().default(true).describe("Whether participants see the point (default true)"),
+			}),
+		},
+		async ({ map_id, description, position, opening_date, meeting_place, visible }) => {
+			try {
+				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/checkpoint`, {
+					method: "POST",
+					body: JSON.stringify({
+						description,
+						position,
+						opening_date: toApiDateTime(opening_date),
+						meeting_place,
+						visible,
+					}),
+				});
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
+			} catch (err) {
+				return apiErrorToMcpResult(err);
+			}
+		},
+	);
+
+	server.registerTool(
+		"create_notice_point",
+		{
+			description: "Creates a notice point (ponto de aviso): an important announcement shown in the map, with no debate. send_email: true also emails the announcement to every participant of the journey right away; it defaults to false, so only set it when the user explicitly asks to send the email.",
+			annotations: ADDITIVE,
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				title: z.string().max(100).optional().describe("Notice title"),
+				description: z.string().min(3).max(2000).describe("Announcement text"),
+				position: positionSchema,
+				send_email: z
+					.boolean()
+					.default(false)
+					.describe("Email the notice to all journey participants (default false; sends real emails)"),
+				visible: z.boolean().default(true).describe("Whether participants see the point (default true)"),
+			}),
+		},
+		async ({ map_id, title, description, position, send_email, visible }) => {
+			try {
+				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/notice-point`, {
+					method: "POST",
+					body: JSON.stringify({ title, description, position, send_email, visible }),
 				});
 				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
 			} catch (err) {

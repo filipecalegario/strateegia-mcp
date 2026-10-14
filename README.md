@@ -19,11 +19,14 @@ Services inside the Strateegia platform can send the user's session JWT instead 
 | `get_point` | One point in full, any type; detects the type when not given |
 | `get_point_content` | What participants produced in a point: debate answers by question, essay responses, monitoring measurements, meeting comments or decision votes; paginated |
 | `create_divergence_point` | Debate point: collect ideas and responses |
-| `update_divergence_point` | Change a debate point's title, introduction or visibility |
 | `add_question_to_divergence_point` | Add a question to a debate point |
 | `create_convergence_point` | Decision point: group poll |
 | `create_essay_point` | Evaluation point: long-form answers with optional peer review |
 | `create_monitor_point` | Monitoring point: qualitative status or numeric KPI (`CUMULATIVE` or `RECURRING`) |
+| `create_checkpoint_point` | Meeting point: schedule an in-person or online meeting |
+| `create_notice_point` | Notice point: an announcement in the map, optionally emailed |
+| `update_point` | Edit any point type; only the fields that change, rejected up front when the type does not accept them |
+| `close_point` | Close a decision or meeting point (irreversible) |
 | `add_monitor_status` | Record a measurement on a monitoring point |
 | `update_point_position` | Move any point on the map grid |
 | `add_comment_to_question` | Answer a debate question |
@@ -32,7 +35,7 @@ Services inside the Strateegia platform can send the user's session JWT instead 
 | `unlike_comment` | Remove your like from an answer |
 | `list_tool_templates` | List the debate templates available to the user |
 
-Every tool declares risk annotations (read-only, additive, reversible or overwrite), and failures come back with `isError: true`. No tool deletes anything.
+Every tool declares risk annotations (read-only, additive, reversible, overwrite or irreversible), and failures come back with `isError: true`. No tool deletes anything.
 
 ## Development
 

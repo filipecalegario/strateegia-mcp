@@ -1,19 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { READ_ONLY } from "./annotations.js";
-import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError, toolError } from "../strateegia-client.js";
+import { strateegiaFetch, apiErrorToMcpResult, toolError } from "../strateegia-client.js";
+import { isToolError, resolvePoint, type Dict } from "./point-types.js";
 
-/** Per-type GET routes. A wrong-type id returns 403, so these can be probed to detect the type. */
-const POINT_ROUTES = {
-	DIVERGENCE: "divergence-point",
-	CONVERGENCE: "convergence-point",
-	ESSAY: "essay-point",
-	MONITOR: "monitor-point",
-	CHECKPOINT: "checkpoint",
-} as const;
-
-type PointType = keyof typeof POINT_ROUTES;
-type Dict = Record<string, unknown>;
+const PARTICIPATION_TYPES = ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT"] as const;
 
 /** Spring Page envelope used by the paginated participation endpoints. */
 interface SpringPage {
@@ -105,39 +96,16 @@ export function registerPointContentTools(server: McpServer, getToken: () => str
 		async ({ point_id, point_type, question_id, page, size, include_evaluation_feedback }) => {
 			try {
 				const token = getToken();
-				const fetchPoint = async (type: PointType) => ({
-					type,
-					data: (await strateegiaFetch(token, `/v1/${POINT_ROUTES[type]}/${point_id}`)) as Dict,
-				});
+				const resolved = await resolvePoint(
+					token,
+					point_id,
+					point_type,
+					PARTICIPATION_TYPES,
+					`No point found with id ${point_id}. It may not exist, it may be a notice point (which has no participation), or the authenticated user may not have access to it.`,
+				);
+				if (isToolError(resolved)) return resolved;
 
-				let resolved: { type: PointType; data: Dict };
-				if (point_type) {
-					try {
-						resolved = await fetchPoint(point_type);
-					} catch (err) {
-						// A mismatched type also answers 403, so point the caller at auto-detection.
-						if (err instanceof StrateegiaApiError && err.status === 403) {
-							return toolError(`Could not read point ${point_id} as ${point_type} (403). Either the point is a different type (retry without point_type to auto-detect) or the authenticated user has no access to it.`);
-						}
-						throw err;
-					}
-				} else {
-					// Probe every route at once; only the matching type returns 2xx.
-					const types = Object.keys(POINT_ROUTES) as PointType[];
-					const settled = await Promise.allSettled(types.map(fetchPoint));
-					const hit = settled.find((r) => r.status === "fulfilled");
-					if (!hit || hit.status !== "fulfilled") {
-						// A wrong type answers 403/404; anything else (401, 429, 5xx) is a real failure.
-						const failure = settled
-							.map((r) => (r.status === "rejected" ? r.reason : null))
-							.find((e) => e instanceof StrateegiaApiError && e.status !== 403 && e.status !== 404);
-						if (failure) throw failure;
-						return toolError(`No point found with id ${point_id}. It may not exist, it may be a notice point (which has no participation), or the authenticated user may not have access to it.`);
-					}
-					resolved = hit.value;
-				}
-
-				const route = `/v1/${POINT_ROUTES[resolved.type]}/${point_id}`;
+				const { route } = resolved;
 				const envelope = { point_id, point_type: resolved.type, page, size };
 				const respond = (body: Dict) => ({
 					content: [{ type: "text" as const, text: JSON.stringify({ ...envelope, ...body }) }],
@@ -210,6 +178,8 @@ export function registerPointContentTools(server: McpServer, getToken: () => str
 							status: resolved.data.status,
 						});
 					}
+					default:
+						return toolError(`A ${resolved.type} point has no participation to read.`);
 				}
 			} catch (err) {
 				return apiErrorToMcpResult(err);

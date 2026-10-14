@@ -1,6 +1,6 @@
 # 004 — Pontos de checkpoint e aviso
 
-**Status:** Not started
+**Status:** In review
 **Prioridade:** Média (Tier 4)
 **Tools novas:** `create_checkpoint_point`, `create_notice_point`
 
@@ -60,7 +60,21 @@ Este tem `title`, e tem `send_email`.
 
 ## Critérios de aceitação
 
-- [ ] Corpos de criação confirmados na spec OpenAPI (não inferidos da leitura)
-- [ ] Ambos os tipos criáveis e visíveis no `get_map`
-- [ ] `send_email` default `false`, com aviso na descrição
-- [ ] Sem capacidade de deleção
+- [x] Corpos de criação confirmados na spec OpenAPI (não inferidos da leitura)
+- [x] Ambos os tipos criáveis e visíveis no `get_map`
+- [x] `send_email` default `false`, com aviso na descrição
+- [x] Sem capacidade de deleção
+
+## Implementação (14/10/2026)
+
+Tools `create_checkpoint_point` e `create_notice_point` em `src/tools/points.ts`, anotadas como `ADDITIVE`.
+
+**Corpos conferidos na spec OpenAPI** (`CreateCheckpointDTO`, `CreateNoticePointDTO`), com duas diferenças em relação ao previsto acima:
+
+- `opening_date` é **obrigatória** no checkpoint, não opcional. `visible` também é obrigatório nos dois; a tool usa `true` como padrão.
+- No aviso, `title` é opcional e `send_email` é obrigatório; a tool usa `false` como padrão.
+
+**Datas em UTC sem fuso.** A API declara `date-time`, mas lê `opening_date` como data local: recusa `2026-10-20T14:00:00-03:00` ("unparsed text found") e aceita `2026-10-20T17:00:00.000Z`, que é o que o front envia com `toISOString()`. A tool aceita ISO 8601 com fuso e converte para UTC (`toApiDateTime` em `strateegia-client.ts`).
+
+**Verificado ao vivo em dev** (jornada de teste "[teste MCP] specs 004 e 005"): encontro criado com `-03:00` e gravado em UTC (`17:00`); aviso criado com `send_email: false`; os dois aparecem no índice do `get_map`. A API não deixa criar encontro com data passada ("Invalid request content").
+
