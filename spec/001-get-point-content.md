@@ -1,6 +1,6 @@
 # 001 — `get_point_content`: ler a participação
 
-**Status:** In review
+**Status:** Done (em produção desde 14/10/2026, versão `b43618f7`)
 **Prioridade:** Alta (Tier 1)
 **Tools novas:** `get_point_content`
 
