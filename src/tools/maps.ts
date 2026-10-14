@@ -14,6 +14,7 @@ const POINT_CONTAINERS = {
 	monitor_points: { kind: "MONITOR", contentKey: "comments" },
 	checkpoints: { kind: "CHECKPOINT", contentKey: "comments" },
 	notice_points: { kind: "NOTICE", contentKey: null },
+	status_points: { kind: "STATUS", contentKey: "answers" },
 } as const;
 
 type Dict = Record<string, unknown>;
@@ -80,7 +81,8 @@ function stripContent(content: Dict) {
 			if (!entry) return raw;
 			const point = asDict(entry.point);
 			if (!point) return entry; // notice_points: nothing nested to strip
-			const { statuses, ...restPoint } = point;
+			// A survey's yaml repeats its questions, which already come structured.
+			const { statuses, yaml, ...restPoint } = point;
 			const trimmed: Dict = { point: restPoint };
 			if (contentKey) trimmed[`${contentKey}_count`] = countOf(entry[contentKey]);
 			if (Array.isArray(statuses)) trimmed.statuses_count = statuses.length;
@@ -140,7 +142,7 @@ export function registerMapTools(server: McpServer, getToken: () => string) {
 	server.registerTool(
 		"get_map",
 		{
-			description: "Gets the points of a journey map (divergence, convergence, essay, monitor, checkpoint, notice) with their positions on the row/col grid. Defaults to a compact index, because a busy map's full content can run to megabytes and exceed client response limits. detail levels: 'summary' (default) = one row per point (id, type, title, position) plus counts of the omitted participant content — start here to find the point you want; 'points' = full configuration of every point (goal, flow, questions, dates...) with participant content still omitted; 'full' = everything including every response, answer, comment and status (can be very large — prefer get_point for a single point).",
+			description: "Gets the points of a journey map (divergence, convergence, essay, monitor, checkpoint, notice, and status: the survey point, ponto de pesquisa) with their positions on the row/col grid. Defaults to a compact index, because a busy map's full content can run to megabytes and exceed client response limits. detail levels: 'summary' (default) = one row per point (id, type, title, position) plus counts of the omitted participant content; start here to find the point you want; 'points' = full configuration of every point (goal, flow, questions, dates...) with participant content still omitted; 'full' = everything including every response, answer, comment and status (can be very large; prefer get_point for a single point).",
 			annotations: READ_ONLY,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
