@@ -1,6 +1,6 @@
 # 001 — `get_point_content`: ler a participação
 
-**Status:** Not started
+**Status:** In review
 **Prioridade:** Alta (Tier 1)
 **Tools novas:** `get_point_content`
 
@@ -101,9 +101,37 @@ LLM) e os campos de auditoria (`updated_by`, `edited_at`) salvo se pedidos.
 
 ## Critérios de aceitação
 
-- [ ] Retorna participação para DIVERGENCE, ESSAY, MONITOR e CHECKPOINT
-- [ ] Auto-detecção de tipo funciona; `point_type` explícito pula a sondagem
-- [ ] Envelope Spring Page achatado em `{items, page, total, has_more}`
-- [ ] Debate agrupado por pergunta, com as perguntas resolvidas internamente
-- [ ] Resposta de um ponto com participação real cabe em ordens de grandeza abaixo do `get_map full`
-- [ ] Comportamento definido (e documentado) para convergência
+- [x] Retorna participação para DIVERGENCE, ESSAY, MONITOR e CHECKPOINT
+- [x] Auto-detecção de tipo funciona; `point_type` explícito pula a sondagem
+- [x] Envelope Spring Page achatado em `{items, page, total, has_more}`
+- [x] Debate agrupado por pergunta, com as perguntas resolvidas internamente
+- [x] Resposta de um ponto com participação real cabe em ordens de grandeza abaixo do `get_map full`
+- [x] Comportamento definido (e documentado) para convergência
+
+## Implementação (14/10/2026)
+
+Motivada pelo chat da jornada (STRAT-3161): pedido "faz um resumo das respostas da questão 1", o chat não tinha como ler as respostas e respondeu que não conseguia acessá-las.
+
+**Tool:** `get_point_content(point_id, point_type?, question_id?, page = 0, size = 10, include_evaluation_feedback = false)`, em `src/tools/point-content.ts`, anotada como `READ_ONLY`.
+
+**Verificado ao vivo** (API de produção, só leituras, com amostras com participação real):
+
+| Tipo | Amostra | Resultado |
+|---|---|---|
+| Debate | 10 perguntas, 433 comentários | agrupado por pergunta; com `question_id`, só aquela (52 comentários) |
+| Decisão | 1 pergunta, 64 participantes | votos agregados 32, 24 e 13 por opção, em 616 bytes |
+| Dissertação | 43 respostas | paginada localmente; o endpoint ignora `page`/`size` e devolve tudo |
+| Monitoramento | 7 medições | lista completa |
+| Checkpoint | 4 comentários | página Spring achatada |
+
+O `get_map` com `detail: "full"` do mapa do debate tem 6 MB; a pergunta filtrada, 3 KB.
+
+**Decisões:**
+
+- **Convergência resolvida sem `get_map`:** cada opção traz `count_vote` e o ponto traz `answer_count`, então os votos agregados vêm do próprio `GET /v1/convergence-point/{id}`. Votos individuais não são expostos pela API, e a descrição da tool diz isso.
+- **`size` padrão 10, não 20:** com 20, o debate sem filtro dava 55 KB e a página de dissertação 100 KB, o que esgota numa chamada o orçamento de 30 mil tokens por sala do chat da jornada. Com 10: debate sem filtro ~28 KB, uma pergunta ~3 KB, dissertação ~33 KB.
+- **Feedback de avaliação opcional:** o texto da avaliação por IA de cada dissertação tem quase o tamanho da própria resposta (mediana de 1.779 contra 1.527 caracteres). Por padrão vem só a nota; o texto vem com `include_evaluation_feedback: true`.
+- **Respostas a comentários** são contadas (`reply_count`), não incluídas.
+- **Autor** reduzido ao nome, com `is_assistant: true` quando o comentário foi gerado por um assistente de IA.
+- **Erros:** pergunta que não é do ponto devolve a lista das perguntas válidas, para o modelo se corrigir; tipo explícito errado e id inexistente seguem o padrão do `get_point`.
+

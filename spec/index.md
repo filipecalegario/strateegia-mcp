@@ -18,7 +18,7 @@ endpoint.
 
 | # | Spec | Tools | Prioridade | Status |
 |---|---|---|---|---|
-| 001 | [Ler a participação](001-get-point-content.md) | `get_point_content` | Alta | Not started |
+| 001 | [Ler a participação](001-get-point-content.md) | `get_point_content` | Alta | In review |
 | 002 | [Métricas e engajamento](002-get-analytics.md) | `get_analytics` | Alta | Not started |
 | 003 | [Membros e convites](003-members-and-invites.md) | `list_members`, `invite_to_project` | Média | Not started |
 | 004 | [Checkpoint e aviso](004-checkpoint-and-notice-points.md) | `create_checkpoint_point`, `create_notice_point` | Média | Not started |
@@ -40,11 +40,11 @@ read-only baratos.
 
 De 003 a 006 a ordem é indiferente — seguir a demanda real.
 
-## Já implementado (20 tools)
+## Já implementado (21 tools)
 
 Projetos: `list_projects`, `get_project`, `create_project`
 Mapas: `create_map`, `list_maps_in_project`, `get_map` *(com níveis de detalhe)*
-Pontos: `get_point`, `create_divergence_point`, `create_convergence_point`,
+Pontos: `get_point`, `get_point_content`, `create_divergence_point`, `create_convergence_point`,
 `create_essay_point`, `create_monitor_point`, `update_divergence_point`,
 `update_point_position`, `add_monitor_status`
 Comentários: `add_comment_to_question`, `add_question_to_divergence_point`,
