@@ -8,6 +8,7 @@ export const POINT_ROUTES = {
 	MONITOR: "monitor-point",
 	CHECKPOINT: "checkpoint",
 	NOTICE: "notice-point",
+	STATUS: "status-point",
 } as const;
 
 export type PointType = keyof typeof POINT_ROUTES;

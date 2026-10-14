@@ -1,17 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { ADDITIVE, READ_ONLY, REVERSIBLE_SET } from "./annotations.js";
-import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError, toolError, toApiDateTime } from "../strateegia-client.js";
+import { strateegiaFetch, apiErrorToMcpResult, toolError, toApiDateTime } from "../strateegia-client.js";
+import { isToolError, resolvePoint } from "./point-types.js";
 
-/** Per-type GET routes. A wrong-type id returns 403, so these can be probed to detect the type. */
-const POINT_ENDPOINTS = {
-	DIVERGENCE: "divergence-point",
-	CONVERGENCE: "convergence-point",
-	ESSAY: "essay-point",
-	MONITOR: "monitor-point",
-} as const;
-
-type PointType = keyof typeof POINT_ENDPOINTS;
+const ALL_TYPES = ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT", "NOTICE", "STATUS"] as const;
 
 const positionSchema = z.object({
 	row: z.number().int().describe("Row in the map grid"),
@@ -31,12 +24,12 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 	server.registerTool(
 		"get_point",
 		{
-			description: "Gets one point in full by its id, for any type (divergence, convergence, essay, monitor). Use this instead of get_map when you already know which point you want — it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included — it is paginated behind its own endpoints.",
+			description: "Gets one point in full by its id, for any type: divergence (debate), convergence (decision), essay, monitor, checkpoint (meeting), notice, or status (survey, ponto de pesquisa: a branching questionnaire of single choice questions). Use this instead of get_map when you already know which point you want: it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included (it is paginated behind its own endpoints; use get_point_content).",
 			annotations: READ_ONLY,
 			inputSchema: z.object({
 				point_id: z.string().describe("Point UUID (any type)"),
 				point_type: z
-					.enum(["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR"])
+					.enum(ALL_TYPES)
 					.optional()
 					.describe("Point type, if known — skips auto-detection"),
 			}),
@@ -44,45 +37,16 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		async ({ point_id, point_type }) => {
 			try {
 				const token = getToken();
-				const fetchAs = async (type: PointType) => ({
-					type,
-					data: await strateegiaFetch(token, `/v1/${POINT_ENDPOINTS[type]}/${point_id}`),
-				});
+				const resolved = await resolvePoint(
+					token,
+					point_id,
+					point_type,
+					ALL_TYPES,
+					`No point found with id ${point_id}. It may not exist, or the authenticated user may not have access to it.`,
+				);
+				if (isToolError(resolved)) return resolved;
 
-				let resolved: { type: PointType; data: unknown };
-				if (point_type) {
-					try {
-						resolved = await fetchAs(point_type);
-					} catch (err) {
-						// A mismatched type also answers 403, so point the caller at auto-detection.
-						if (err instanceof StrateegiaApiError && err.status === 403) {
-							return toolError(`Could not read point ${point_id} as ${point_type} (403). Either the point is a different type — retry without point_type to auto-detect — or the authenticated user has no access to it.`);
-						}
-						throw err;
-					}
-				} else {
-					// Probe every route at once; only the matching type returns 2xx.
-					const types = Object.keys(POINT_ENDPOINTS) as PointType[];
-					const settled = await Promise.allSettled(types.map(fetchAs));
-					const hit = settled.find((r) => r.status === "fulfilled");
-					if (!hit || hit.status !== "fulfilled") {
-						// A wrong type answers 403/404; anything else (401, 429, 5xx) is a real
-						// failure and must surface instead of being reported as "not found".
-						const failure = settled
-							.map((r) => (r.status === "rejected" ? r.reason : null))
-							.find(
-								(e) => e instanceof StrateegiaApiError && e.status !== 403 && e.status !== 404,
-							);
-						if (failure) throw failure;
-						return toolError(`No point found with id ${point_id}. It may not exist, or the authenticated user may not have access to it.`);
-					}
-					resolved = hit.value;
-				}
-
-				const point: Record<string, unknown> = {
-					point_type: resolved.type,
-					...(resolved.data as Record<string, unknown>),
-				};
+				const point: Record<string, unknown> = { point_type: resolved.type, ...resolved.data };
 
 				// The monitor endpoint omits the status history; /comments returns it.
 				if (resolved.type === "MONITOR") {
@@ -457,7 +421,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 	server.registerTool(
 		"update_point_position",
 		{
-			description: "Updates the position of any point (divergence, convergence, essay, or monitor) on a map. Pass the new row and col in the map grid. Works for all point types — the endpoint is point-type agnostic.",
+			description: "Updates the position of any point (divergence, convergence, essay, monitor, checkpoint, notice or status/survey) on a map. Pass the new row and col in the map grid. Works for all point types: the endpoint is point-type agnostic.",
 			annotations: REVERSIBLE_SET,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
