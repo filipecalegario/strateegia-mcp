@@ -14,6 +14,19 @@ export function serviceUrl(service: StrateegiaService): string {
 	return `${root}/${service}`;
 }
 
+/**
+ * Date-times go to the API in UTC without an offset (the same value the web app sends with
+ * toISOString); the API rejects an offset such as -03:00. Accepts any ISO 8601 date-time,
+ * converting offsets to UTC; a value without offset is taken as UTC.
+ */
+export function toApiDateTime(value: string): string {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		throw new Error(`Invalid date-time "${value}". Use ISO 8601, e.g. 2026-10-20T14:00:00-03:00.`);
+	}
+	return date.toISOString();
+}
+
 export class StrateegiaApiError extends Error {
 	constructor(
 		public status: number,
@@ -67,8 +80,9 @@ export async function strateegiaFetch(
 		throw new StrateegiaApiError(response.status, body);
 	}
 
-	if (response.status === 204) return null;
-	return response.json();
+	// Several write endpoints answer 200 with an empty body, not only 204.
+	const text = await response.text();
+	return text ? JSON.parse(text) : null;
 }
 
 export type ToolErrorResult = { content: { type: "text"; text: string }[]; isError: true };

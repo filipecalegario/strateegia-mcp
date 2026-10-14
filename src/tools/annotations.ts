@@ -39,3 +39,11 @@ export const OVERWRITE: ToolAnnotations = {
 	idempotentHint: true,
 	openWorldHint: false,
 };
+
+/** Ends something for good (a poll, a meeting); the API offers no way to undo it. */
+export const IRREVERSIBLE: ToolAnnotations = {
+	readOnlyHint: false,
+	destructiveHint: true,
+	idempotentHint: true,
+	openWorldHint: false,
+};

@@ -7,6 +7,7 @@ import { registerPointTools } from "./tools/points.js";
 import { registerCommentTools } from "./tools/comments.js";
 import { registerToolTemplateTools } from "./tools/tool-templates.js";
 import { registerPointContentTools } from "./tools/point-content.js";
+import { registerPointEditingTools } from "./tools/point-editing.js";
 
 /**
  * Builds a fresh server for one request. MCP 2026-07-28 is stateless: there is no
@@ -33,6 +34,7 @@ function buildServer(jwt: string): McpServer {
 	registerCommentTools(server, getToken);
 	registerToolTemplateTools(server, getToken);
 	registerPointContentTools(server, getToken);
+	registerPointEditingTools(server, getToken);
 	return server;
 }
 

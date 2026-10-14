@@ -126,7 +126,7 @@ Execute nesta ordem, usando as tools do MCP (parâmetros exatos na skill `strate
    - `create_convergence_point` (decisão), com questões e opções.
    - `create_essay_point` (avaliação), com tema, `essay_language: "PT_BR"` e configuração de avaliação.
    - `create_monitor_point` (monitoramento), com tipo e descrição.
-5. Se o professor pediu introdução/contextualização num ponto de debate, use `update_divergence_point` logo após criar o ponto.
+5. Se o professor pediu introdução/contextualização num ponto de debate, use `update_point` com o campo `description` (a introdução do debate) logo após criar o ponto.
 
 **Posicionamento no grid**: a divisão semântica dos temas da aula acontece pelas **linhas** do mapa. Cada agrupamento semântico (introdução, aprofundamento, produção, fechamento, etc.) ocupa uma linha inteira, e entre um agrupamento e o próximo deixe **uma linha vazia** de separação.
 
