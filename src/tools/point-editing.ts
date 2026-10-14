@@ -4,19 +4,19 @@ import { IRREVERSIBLE, OVERWRITE } from "./annotations.js";
 import { strateegiaFetch, apiErrorToMcpResult, StrateegiaApiError, toolError, toApiDateTime } from "../strateegia-client.js";
 import { isToolError, resolvePoint, type Dict, type PointType } from "./point-types.js";
 
-const ALL_TYPES = ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT", "NOTICE"] as const;
+const ALL_TYPES = ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT", "NOTICE", "STATUS"] as const;
 
 /** Which point types accept each editable field. */
 const FIELD_SUPPORT = {
-	title: ["DIVERGENCE", "MONITOR", "NOTICE"],
+	title: ["DIVERGENCE", "MONITOR", "NOTICE", "STATUS"],
 	description: ["DIVERGENCE", "MONITOR", "CHECKPOINT", "NOTICE"],
-	visible: ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "NOTICE"],
-	closing_date: ["CONVERGENCE", "ESSAY", "MONITOR"],
+	visible: ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "NOTICE", "STATUS"],
+	closing_date: ["CONVERGENCE", "ESSAY", "MONITOR", "STATUS"],
 	opening_date: ["CHECKPOINT"],
 	meeting_place: ["CHECKPOINT"],
 	goal: ["MONITOR"],
 	color: ["MONITOR"],
-	anonymous: ["DIVERGENCE", "ESSAY"],
+	anonymous: ["DIVERGENCE", "ESSAY", "STATUS"],
 	individual_mode: ["ESSAY"],
 	single_shot_mode: ["ESSAY"],
 	end_time_mode: ["ESSAY"],
@@ -40,12 +40,12 @@ export function registerPointEditingTools(server: McpServer, getToken: () => str
 	server.registerTool(
 		"update_point",
 		{
-			description: "Updates an existing point of any type: debate (divergence), decision (convergence), essay, monitor, meeting (checkpoint) or notice. Pass only the fields that change; the type is detected automatically (point_type skips detection). Each type accepts a subset of fields: a field the type does not support is rejected before anything is changed, with the list of fields it does support. Several fields may take several API calls; if one fails midway, the error says which fields were already applied. Returns the updated point. To end a decision or a meeting, use close_point instead.",
+			description: "Updates an existing point of any type: debate (divergence), decision (convergence), essay, monitor, meeting (checkpoint), notice or survey (status, ponto de pesquisa). Pass only the fields that change; the type is detected automatically (point_type skips detection). Each type accepts a subset of fields: a field the type does not support is rejected before anything is changed, with the list of fields it does support. Several fields may take several API calls; if one fails midway, the error says which fields were already applied. Returns the updated point. To end a decision or a meeting, use close_point instead.",
 			annotations: OVERWRITE,
 			inputSchema: z.object({
 				point_id: z.string().describe("Point UUID (any type)"),
 				point_type: z.enum(ALL_TYPES).optional().describe("Point type, if known; skips auto-detection"),
-				title: z.string().min(3).max(100).optional().describe("New title (debate, monitor, notice)"),
+				title: z.string().min(3).max(100).optional().describe("New title (debate, monitor, notice, survey)"),
 				description: z
 					.string()
 					.min(3)
@@ -56,7 +56,7 @@ export function registerPointEditingTools(server: McpServer, getToken: () => str
 				closing_date: z
 					.string()
 					.optional()
-					.describe("ISO 8601 with time zone offset; sent to the API in UTC. Closing date of a decision or essay; conclusion date of a monitor. An essay only accepts it while end_time_mode is on: pass end_time_mode: true in the same call if needed"),
+					.describe("ISO 8601 with time zone offset; sent to the API in UTC. Closing date of a decision, essay or survey (a survey stops taking answers after it); conclusion date of a monitor. An essay only accepts it while end_time_mode is on: pass end_time_mode: true in the same call if needed"),
 				opening_date: z
 					.string()
 					.optional()
@@ -67,7 +67,7 @@ export function registerPointEditingTools(server: McpServer, getToken: () => str
 				anonymous: z
 					.boolean()
 					.optional()
-					.describe("Anonymous mode of a debate or essay. While on, contributions show no author; turning it off shows the author of every contribution, including those made while it was on. Warn the user before turning it off."),
+					.describe("Anonymous mode of a debate, essay or survey. While on, contributions show no author; turning it off shows the author of every contribution, including those made while it was on. Warn the user before turning it off."),
 				individual_mode: z.boolean().optional().describe("Essay: participants see only their own responses"),
 				single_shot_mode: z.boolean().optional().describe("Essay: each participant can answer only once"),
 				end_time_mode: z.boolean().optional().describe("Essay: answers are accepted only until the closing date. Must be on to set an essay closing_date"),
@@ -157,6 +157,12 @@ export function registerPointEditingTools(server: McpServer, getToken: () => str
 							});
 						break;
 					}
+					case "STATUS":
+						if (has("title")) steps.push({ fields: ["title"], run: patch("/name", { name: changes.title }) });
+						if (has("anonymous")) steps.push(toggle("anonymous", "incognito-mode"));
+						if (has("closing_date"))
+							steps.push({ fields: ["closing_date"], run: patch("/closing-date", { closing_date: changes.closing_date }) });
+						break;
 					case "NOTICE": {
 						// The notice PUT replaces the whole point. send_email stays false so an edit never re-sends the notice.
 						const fields = (["title", "description"] as Field[]).filter(has);

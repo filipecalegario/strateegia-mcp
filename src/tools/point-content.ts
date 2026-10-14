@@ -4,7 +4,7 @@ import { READ_ONLY } from "./annotations.js";
 import { strateegiaFetch, apiErrorToMcpResult, toolError } from "../strateegia-client.js";
 import { isToolError, resolvePoint, type Dict } from "./point-types.js";
 
-const PARTICIPATION_TYPES = ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT"] as const;
+const PARTICIPATION_TYPES = ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT", "STATUS"] as const;
 
 /** Spring Page envelope used by the paginated participation endpoints. */
 interface SpringPage {
@@ -63,6 +63,59 @@ function monitorStatusOf(s: Dict): Dict {
 	return { id: s.id, author: authorOf(s.author), value: s.value, message: s.message, created_at: s.created_at };
 }
 
+/**
+ * Survey (status point) results: votes per option of each question, counted over finalized
+ * responses, plus the page of individual responses with option ids turned into their labels.
+ * Respondent ids are dropped: the identified endpoint is for journey staff spreadsheets only.
+ */
+function surveyResultsOf(questions: Dict[], responses: Dict[], page: number, size: number) {
+	const labels = new Map<string, string>();
+	const votes = new Map<string, Map<string, number>>();
+	const answered = new Map<string, number>();
+	for (const q of questions) {
+		const counts = new Map<string, number>();
+		for (const o of (q.options ?? []) as Dict[]) {
+			labels.set(`${q.id}/${o.id}`, o.label as string);
+			counts.set(o.id as string, 0);
+		}
+		votes.set(q.id as string, counts);
+	}
+
+	const finalized = responses.filter((r) => r.finalized);
+	for (const r of finalized) {
+		for (const { answer } of (r.answered_questions ?? []) as { answer: Dict }[]) {
+			const qid = answer.question_id as string;
+			answered.set(qid, (answered.get(qid) ?? 0) + 1);
+			const counts = votes.get(qid);
+			for (const id of (answer.selected_option_ids ?? []) as string[]) counts?.set(id, (counts.get(id) ?? 0) + 1);
+		}
+	}
+
+	const paged = pageOf(finalized, page, size);
+	return {
+		...paged,
+		items: paged.items.map((r) => ({
+			answer_id: r.answer_id,
+			answers: ((r.answered_questions ?? []) as { answer: Dict }[]).map(({ answer }) => ({
+				question_id: answer.question_id,
+				choices: ((answer.selected_option_ids ?? []) as string[]).map((id) => labels.get(`${answer.question_id}/${id}`) ?? id),
+				...(answer.text ? { text: answer.text } : {}),
+			})),
+		})),
+		questions: questions.map((q) => ({
+			question_id: q.id,
+			question: q.text,
+			answered: answered.get(q.id as string) ?? 0,
+			options: ((q.options ?? []) as Dict[]).map((o) => ({
+				text: o.label,
+				votes: votes.get(q.id as string)?.get(o.id as string) ?? 0,
+				...(o.next && o.next !== "END" ? { next_question_id: o.next } : {}),
+			})),
+		})),
+		in_progress: responses.length - finalized.length,
+	};
+}
+
 /** Pages a plain list locally, for the endpoints that return everything at once. */
 function pageOf<T>(list: T[], page: number, size: number) {
 	const start = page * size;
@@ -73,12 +126,12 @@ export function registerPointContentTools(server: McpServer, getToken: () => str
 	server.registerTool(
 		"get_point_content",
 		{
-			description: "Gets what participants produced in one point: debate answers, essay responses, monitoring measurements, meeting (checkpoint) comments or decision (convergence) results. Sibling of get_point, which returns the point's configuration but not its participation. Use this to read, summarize or analyze what people said. If point_type is omitted the type is detected automatically. Divergence (ponto de debate): comments are grouped by question, with the question text; pass question_id (from get_point) to read a single question. Convergence (ponto de decisão): returns aggregated votes per option and the number of participants; individual votes are not available. Results are paginated with page (0-based) and size; has_more tells whether another page exists, and for debates page/size apply to each question. Replies to a comment are counted in reply_count but not included. Author is reduced to the name, with is_assistant: true when an AI assistant wrote it. Essay (ponto de avaliação) responses carry the evaluation grade; the AI evaluation feedback text, about as long as the essay, comes only with include_evaluation_feedback.",
+			description: "Gets what participants produced in one point: debate answers, essay responses, monitoring measurements, meeting (checkpoint) comments, decision (convergence) results or survey (status, ponto de pesquisa) results. Sibling of get_point, which returns the point's configuration but not its participation. Use this to read, summarize or analyze what people said. If point_type is omitted the type is detected automatically. Divergence (ponto de debate): comments are grouped by question, with the question text; pass question_id (from get_point) to read a single question. Convergence (ponto de decisão): returns aggregated votes per option and the number of participants; individual votes are not available. Results are paginated with page (0-based) and size; has_more tells whether another page exists, and for debates page/size apply to each question. Replies to a comment are counted in reply_count but not included. Author is reduced to the name, with is_assistant: true when an AI assistant wrote it. Status (ponto de pesquisa): returns votes per option of every question, counted over finalized responses, plus a page of individual responses (choices as option labels, no respondent identity); in_progress counts responses not yet finalized, and next_question_id shows the branching. Survey results are readable only by journey staff, unless the point shares its results with participants. Essay (ponto de avaliação) responses carry the evaluation grade; the AI evaluation feedback text, about as long as the essay, comes only with include_evaluation_feedback.",
 			annotations: READ_ONLY,
 			inputSchema: z.object({
 				point_id: z.string().describe("Point UUID (any type)"),
 				point_type: z
-					.enum(["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT"])
+					.enum(PARTICIPATION_TYPES)
 					.optional()
 					.describe("Point type, if known; skips auto-detection"),
 				question_id: z
@@ -175,6 +228,18 @@ export function registerPointContentTools(server: McpServer, getToken: () => str
 							total: resolved.data.answer_count,
 							has_more: false,
 							allow_multiple_answers: resolved.data.allow_multiple_answers,
+							status: resolved.data.status,
+						});
+					}
+					case "STATUS": {
+						// Every response comes at once; only finalized ones count, as in the platform's chart.
+						const { incognito, responses } = (await strateegiaFetch(token, `${route}/answer/responses`)) as {
+							incognito: boolean;
+							responses: Dict[];
+						};
+						return respond({
+							...surveyResultsOf((resolved.data.questions ?? []) as Dict[], responses, page, size),
+							anonymous: incognito,
 							status: resolved.data.status,
 						});
 					}
