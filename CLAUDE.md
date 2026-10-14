@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Remote MCP (Model Context Protocol) server for the Strateegia platform, deployed on Cloudflare Workers. Exposes 20 tools that map to the Strateegia Projects, Tools, and Users APIs, allowing MCP clients to manage projects, maps, points, comments, and tool templates.
+Remote MCP (Model Context Protocol) server for the Strateegia platform, deployed on Cloudflare Workers. Exposes 21 tools that map to the Strateegia Projects, Tools, and Users APIs, allowing MCP clients to manage projects, maps, points, comments, and tool templates.
 
 ## Commands
 
@@ -28,11 +28,13 @@ npm run cf-typegen   # Regenerate worker-configuration.d.ts from wrangler.jsonc
 **Key files:**
 - `src/index.ts`: Worker entrypoint. Auth check, Origin validation, key exchange, and `buildServer(jwt)`, which registers all tools via domain modules. The MCP handler is created once at module level; `allowedOriginHostnames: "*"` because Origin is already validated in the entrypoint.
 - `src/strateegia-client.ts` — `strateegiaFetch(token, path, init?)` helper that builds URLs, injects Bearer token, and wraps errors as `StrateegiaApiError`.
-- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (8), `comments.ts` (5), `tool-templates.ts` (1). Each file exports a `register*Tools(server, getToken)` function that uses `server.registerTool(name, { description, inputSchema: z.object({...}) }, handler)`. The SDK v2 `McpServer` has no `server.tool()`.
+- `src/tools/` — Tools organized by domain: `projects.ts` (3), `maps.ts` (3), `points.ts` (8), `comments.ts` (5), `tool-templates.ts` (1), `point-content.ts` (1). Each file exports a `register*Tools(server, getToken)` function that uses `server.registerTool(name, { description, inputSchema: z.object({...}) }, handler)`. The SDK v2 `McpServer` has no `server.tool()`.
 
 **Strateegia domain hierarchy:** Lab > Project > Map > Point > Content. Point types: Divergence (brainstorming), Convergence (polls/voting), Essay (long-form + evaluation), Monitor (progress tracking).
 
 **Reading points without blowing the response limit:** `/v1/map/{id}/content` embeds every point *with* its participant content, so a busy map easily reaches megabytes and can exceed client limits. `get_map` therefore defaults to `detail: "summary"` (an index of id/type/title/position plus counts) and offers `"points"` (full config, content stripped) and `"full"` (raw). To read a single point, use `get_point` — the per-type routes (`/v1/{divergence,convergence,essay,monitor}-point/{id}`) answer 403 for a mismatched id, which is what makes type auto-detection possible. Monitor points are the exception to "one point, one call": their endpoint reports only `current_status`, so `get_point` also fetches `/v1/monitor-point/{id}/comments` for the full status history.
+
+**Reading participation:** `get_point_content` (`src/tools/point-content.ts`) returns what participants produced, which `get_point` leaves out. It probes the same per-type routes plus `/v1/checkpoint/{id}`, then dispatches: debate comments are reachable only per question, so it lists `/v1/divergence-point/{id}/question` and pages `/question/{qid}/comment` for each (or one, with `question_id`); checkpoints page `/v1/checkpoint/{id}/comment`; essay `/responses` and monitor `/comments` return everything at once, so they are paged locally; convergence has no results endpoint, but each option carries `count_vote` and the point `answer_count`, so aggregated votes come from the point itself (individual votes are not exposed). Output is one envelope `{point_id, point_type, items, page, size, total, has_more}`, authors reduced to name (plus `is_assistant` when true). Default page size is 10 and essay evaluation feedback is opt-in (`include_evaluation_feedback`), because both dominate response size and the in-platform chat has a token budget per chat room.
 
 ## Conventions
 

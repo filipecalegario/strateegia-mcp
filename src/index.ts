@@ -6,6 +6,7 @@ import { registerMapTools } from "./tools/maps.js";
 import { registerPointTools } from "./tools/points.js";
 import { registerCommentTools } from "./tools/comments.js";
 import { registerToolTemplateTools } from "./tools/tool-templates.js";
+import { registerPointContentTools } from "./tools/point-content.js";
 
 /**
  * Builds a fresh server for one request. MCP 2026-07-28 is stateless: there is no
@@ -31,6 +32,7 @@ function buildServer(jwt: string): McpServer {
 	registerPointTools(server, getToken);
 	registerCommentTools(server, getToken);
 	registerToolTemplateTools(server, getToken);
+	registerPointContentTools(server, getToken);
 	return server;
 }
 

@@ -17,6 +17,7 @@ Services inside the Strateegia platform can send the user's session JWT instead 
 | `create_map` | Create a map inside a project |
 | `get_map` | Points of a map; a compact index by default (`detail`: `summary`, `points`, `full`) |
 | `get_point` | One point in full, any type; detects the type when not given |
+| `get_point_content` | What participants produced in a point: debate answers by question, essay responses, monitoring measurements, meeting comments or decision votes; paginated |
 | `create_divergence_point` | Debate point: collect ideas and responses |
 | `update_divergence_point` | Change a debate point's title, introduction or visibility |
 | `add_question_to_divergence_point` | Add a question to a debate point |
