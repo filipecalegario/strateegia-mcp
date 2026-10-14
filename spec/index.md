@@ -18,7 +18,7 @@ endpoint.
 
 | # | Spec | Tools | Prioridade | Status |
 |---|---|---|---|---|
-| 001 | [Ler a participação](001-get-point-content.md) | `get_point_content` | Alta | In review |
+| 001 | [Ler a participação](001-get-point-content.md) | `get_point_content` | Alta | Done (em produção) |
 | 002 | [Métricas e engajamento](002-get-analytics.md) | `get_analytics` | Alta | Not started |
 | 003 | [Membros e convites](003-members-and-invites.md) | `list_members`, `invite_to_project` | Média | Not started |
 | 004 | [Checkpoint e aviso](004-checkpoint-and-notice-points.md) | `create_checkpoint_point`, `create_notice_point` | Média | Not started |
