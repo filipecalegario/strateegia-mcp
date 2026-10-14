@@ -40,7 +40,7 @@ export function registerPointEditingTools(server: McpServer, getToken: () => str
 	server.registerTool(
 		"update_point",
 		{
-			description: "Updates an existing point of any type: debate (divergence), decision (convergence), essay, monitor, meeting (checkpoint), notice or survey (status, ponto de pesquisa). Pass only the fields that change; the type is detected automatically (point_type skips detection). Each type accepts a subset of fields: a field the type does not support is rejected before anything is changed, with the list of fields it does support. Several fields may take several API calls; if one fails midway, the error says which fields were already applied. Returns the updated point. To end a decision or a meeting, use close_point instead.",
+			description: "Updates an existing point of any type: debate (divergence), decision (convergence), essay, monitor, meeting (checkpoint), notice or survey. STATUS is only the API identifier of the survey: when talking to the user, call it 'pesquisa' (ponto de pesquisa), never 'status'. Pass only the fields that change; the type is detected automatically (point_type skips detection). Each type accepts a subset of fields: a field the type does not support is rejected before anything is changed, with the list of fields it does support. Several fields may take several API calls; if one fails midway, the error says which fields were already applied. Returns the updated point. To end a decision or a meeting, use close_point instead.",
 			annotations: OVERWRITE,
 			inputSchema: z.object({
 				point_id: z.string().describe("Point UUID (any type)"),

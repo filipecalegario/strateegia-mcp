@@ -24,7 +24,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 	server.registerTool(
 		"get_point",
 		{
-			description: "Gets one point in full by its id, for any type: divergence (debate), convergence (decision), essay, monitor, checkpoint (meeting), notice, or status (survey, ponto de pesquisa: a branching questionnaire of single choice questions). Use this instead of get_map when you already know which point you want: it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included (it is paginated behind its own endpoints; use get_point_content).",
+			description: "Gets one point in full by its id, for any type: divergence (debate), convergence (decision), essay, monitor, checkpoint (meeting), notice, or survey (a branching questionnaire of single choice questions). STATUS is only the API identifier of the survey: when talking to the user, call it 'pesquisa' (ponto de pesquisa), never 'status'. Use this instead of get_map when you already know which point you want: it returns a couple of KB rather than the whole map, which can run to megabytes. If point_type is omitted the type is detected automatically by probing the per-type routes, so passing it (when known, e.g. from get_map) saves requests. For monitor points the measurement history is fetched separately and attached as `statuses`, since the point endpoint alone only reports `current_status`. Participant content (responses, answers, comments) is NOT included (it is paginated behind its own endpoints; use get_point_content).",
 			annotations: READ_ONLY,
 			inputSchema: z.object({
 				point_id: z.string().describe("Point UUID (any type)"),
@@ -421,7 +421,7 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 	server.registerTool(
 		"update_point_position",
 		{
-			description: "Updates the position of any point (divergence, convergence, essay, monitor, checkpoint, notice or status/survey) on a map. Pass the new row and col in the map grid. Works for all point types: the endpoint is point-type agnostic.",
+			description: "Updates the position of any point (divergence, convergence, essay, monitor, checkpoint, notice or survey) on a map. Pass the new row and col in the map grid. Works for all point types: the endpoint is point-type agnostic.",
 			annotations: REVERSIBLE_SET,
 			inputSchema: z.object({
 				map_id: z.string().describe("Map UUID"),
