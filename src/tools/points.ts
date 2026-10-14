@@ -396,6 +396,67 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 	);
 
 	server.registerTool(
+		"create_checkpoint_point",
+		{
+			description: "Creates a meeting point (ponto de encontro, called checkpoint in the API) to schedule an in-person or online meeting: subject, date and time, and where it happens. Participants can comment on it. A meeting point has no title; the description identifies it in the map.",
+			annotations: ADDITIVE,
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				description: z.string().min(3).max(1000).describe("Meeting subject and agenda; shown as the point's label"),
+				position: positionSchema,
+				opening_date: z.string().describe("Meeting date and time (ISO 8601, e.g. 2026-10-20T14:00:00-03:00)"),
+				meeting_place: z
+					.string()
+					.max(500)
+					.optional()
+					.describe("Address or videoconference link"),
+				visible: z.boolean().default(true).describe("Whether participants see the point (default true)"),
+			}),
+		},
+		async ({ map_id, description, position, opening_date, meeting_place, visible }) => {
+			try {
+				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/checkpoint`, {
+					method: "POST",
+					body: JSON.stringify({ description, position, opening_date, meeting_place, visible }),
+				});
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
+			} catch (err) {
+				return apiErrorToMcpResult(err);
+			}
+		},
+	);
+
+	server.registerTool(
+		"create_notice_point",
+		{
+			description: "Creates a notice point (ponto de aviso): an important announcement shown in the map, with no debate. send_email: true also emails the announcement to every participant of the journey right away; it defaults to false, so only set it when the user explicitly asks to send the email.",
+			annotations: ADDITIVE,
+			inputSchema: z.object({
+				map_id: z.string().describe("Map UUID"),
+				title: z.string().max(100).optional().describe("Notice title"),
+				description: z.string().min(3).max(2000).describe("Announcement text"),
+				position: positionSchema,
+				send_email: z
+					.boolean()
+					.default(false)
+					.describe("Email the notice to all journey participants (default false; sends real emails)"),
+				visible: z.boolean().default(true).describe("Whether participants see the point (default true)"),
+			}),
+		},
+		async ({ map_id, title, description, position, send_email, visible }) => {
+			try {
+				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/notice-point`, {
+					method: "POST",
+					body: JSON.stringify({ title, description, position, send_email, visible }),
+				});
+				return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
+			} catch (err) {
+				return apiErrorToMcpResult(err);
+			}
+		},
+	);
+
+	server.registerTool(
 		"add_monitor_status",
 		{
 			description: "Records a measurement (status) on an existing monitor point (ponto de monitoramento), appending one entry to its tracking history — the way progress is logged over time in the Strateegia UI. The value type determines the monitor kind: pass a NUMBER for QUANTITATIVE monitors (the value measured this period, compared against the point's goal/flow), or one of IN_PROGRESS / SUSPENDED / COMPLETED for QUALITATIVE monitors (the reported state). Optionally attach a message explaining the measurement (e.g. the cause of a delay). Use get_map to find the monitor_point_id and to confirm whether the point is quantitative or qualitative.",
