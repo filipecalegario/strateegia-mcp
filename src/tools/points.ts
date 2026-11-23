@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ADDITIVE, READ_ONLY, REVERSIBLE_SET } from "./annotations.js";
 import { strateegiaFetch, apiErrorToMcpResult, toolError, toApiDateTime } from "../strateegia-client.js";
 import { isToolError, resolvePoint } from "./point-types.js";
+import { freePosition, NO_FREE_POSITION } from "./map-slots.js";
 
 const ALL_TYPES = ["DIVERGENCE", "CONVERGENCE", "ESSAY", "MONITOR", "CHECKPOINT", "NOTICE", "STATUS"] as const;
 
@@ -100,6 +101,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 		async ({ map_id, title, position, questions, tool_id, color, visible, introduction }) => {
 			try {
+				const slot = await freePosition(getToken(), map_id, position);
+				if (!slot) return toolError(NO_FREE_POSITION);
+				position = slot;
 				if (!questions && !tool_id) {
 					return toolError("Error: provide either 'questions' (to create a new template) or 'tool_id' (to use an existing template)");
 				}
@@ -162,6 +166,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 		async ({ map_id, name, position, questions, closing_date, visible, allow_multiple_answers }) => {
 			try {
+				const slot = await freePosition(getToken(), map_id, position);
+				if (!slot) return toolError(NO_FREE_POSITION);
+				position = slot;
 				const body: Record<string, unknown> = {
 					name,
 					position,
@@ -226,6 +233,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 			thematic,
 		}) => {
 			try {
+				const slot = await freePosition(getToken(), map_id, position);
+				if (!slot) return toolError(NO_FREE_POSITION);
+				position = slot;
 				const body: Record<string, unknown> = {
 					essay_name,
 					position,
@@ -284,6 +294,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 		async ({ map_id, name, description, position, conclusion_date, monitor_type, goal, type, flow }) => {
 			try {
+				const slot = await freePosition(getToken(), map_id, position);
+				if (!slot) return toolError(NO_FREE_POSITION);
+				position = slot;
 				const body: Record<string, unknown> = {
 					name,
 					description,
@@ -329,6 +342,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 		async ({ map_id, description, position, opening_date, meeting_place, visible }) => {
 			try {
+				const slot = await freePosition(getToken(), map_id, position);
+				if (!slot) return toolError(NO_FREE_POSITION);
+				position = slot;
 				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/checkpoint`, {
 					method: "POST",
 					body: JSON.stringify({
@@ -365,6 +381,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 		async ({ map_id, title, description, position, send_email, visible }) => {
 			try {
+				const slot = await freePosition(getToken(), map_id, position);
+				if (!slot) return toolError(NO_FREE_POSITION);
+				position = slot;
 				const data = await strateegiaFetch(getToken(), `/v1/map/${map_id}/notice-point`, {
 					method: "POST",
 					body: JSON.stringify({ title, description, position, send_email, visible }),
@@ -432,6 +451,9 @@ export function registerPointTools(server: McpServer, getToken: () => string) {
 		},
 		async ({ map_id, point_id, row, col }) => {
 			try {
+				const slot = await freePosition(getToken(), map_id, { row, col }, point_id);
+				if (!slot) return toolError(NO_FREE_POSITION);
+				({ row, col } = slot);
 				const data = await strateegiaFetch(
 					getToken(),
 					`/v1/map/${map_id}/point/${point_id}/position`,
